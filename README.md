@@ -7,11 +7,11 @@
 
 <!-- MDOC !-->
 
-Bring's an extensiable SQL parser and sigil to Elixir, confidently write SQL with automatic parameterized queries.
+Brings an extensible SQL parser and sigil to Elixir, confidently write SQL with automatic parameterized queries.
 
-- Lower the barreir for DBA's to contribute in your codebase, without having to translate SQL to Ecto.Query.
-- Composilbe queries, no need for you to remember, when to start with select or from.
-- Interpolational queries, don't fiddle with fragments and `?`.
+- Lower the barrier for DBAs to contribute in your codebase, without having to translate SQL to Ecto.Query.
+- Composable queries, no need for you to remember, when to start with select or from.
+- Interpolation-al queries, don't fiddle with fragments and `?`.
 
 ## Examples
 
