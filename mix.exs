@@ -15,7 +15,8 @@ defmodule SQL.MixProject do
       description: "Brings an extensible SQL parser and sigil to Elixir, confidently write SQL with automatic parameterized queries.",
       name: "SQL",
       docs: docs(),
-      package: package()
+      package: package(),
+      aliases: [bench: "run bench.exs"]
     ]
   end
 
@@ -39,8 +40,9 @@ defmodule SQL.MixProject do
 
   defp deps do
     [
-      {:ex_doc, "~> 0.37", only: :dev},
+      {:benchee, "~> 1.3", only: :dev},
       {:ecto_sql, "~> 3.12", only: [:dev, :test]},
+      {:ex_doc, "~> 0.37", only: :dev},
       {:postgrex, ">= 0.0.0", only: [:dev, :test]},
     ]
   end
