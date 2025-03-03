@@ -3,6 +3,6 @@
 
 # Used by "mix format"
 [
-  plugins: [Ecto.MixFormatter],
+  plugins: [SQL.MixFormatter],
   inputs: ["{mix,.formatter}.exs", "{config,lib,test}/**/*.{ex,exs}"]
 ]
