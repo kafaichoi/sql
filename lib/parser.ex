@@ -222,7 +222,7 @@ defmodule SQL.Parser do
   def parse(<<?#, ?{, rest::binary>>, binary, opts, line, column, _type, data, unit, context, metadata, acc, root) do
     column = column+2
     binding = opts[:binding]
-    case interpolation(rest, line, column) do
+    case interpolation(rest, binding, line, column) do
       {:error, "", end_line, end_column, _acc} ->
         error!([line: line, column: column, end_line: end_line, end_column: end_column, file: "", snippet: binary, opening_delimiter: :"\#{", expected_delimiter: :"}"])
       {rest, end_line, end_column, result} when binding == false ->
@@ -233,7 +233,7 @@ defmodule SQL.Parser do
         else
           raise ArgumentError, "The variable #{result} is not defined"
         end
-      {rest, end_line, end_column, result} ->
+      {rest, end_line, end_column, {result, _}} ->
         parse(rest, binary, update_in(opts, [:params], &(&1++[result])), end_line, end_column, nil, data, unit ++ [{:binding, [line: line, column: column, end_line: end_line, end_column: end_column], [length(opts[:params])]}], context, metadata, acc, root)
     end
   end
@@ -287,27 +287,30 @@ defmodule SQL.Parser do
     parse(rest, binary, opts, line, column+1, type(b, type), data ++ [b], unit, context, metadata, acc, root)
   end
 
-  def interpolation(binary, line, column, type \\ :var, acc \\ [], n \\ 0)
-  def interpolation("" = rest, line, column, _type,  acc, 0), do: {:error, rest, line, column, acc}
-  def interpolation(<<?}, rest::binary>>, line, column, :var, acc, 0) do
+  def interpolation(binary, binding, line, column, type \\ :var, acc \\ [], n \\ 0)
+  def interpolation("" = rest, _binding, line, column, _type,  acc, 0), do: {:error, rest, line, column, acc}
+  def interpolation(<<?}, rest::binary>>, _binding, line, column, :var, acc, 0) do
     {<<rest::binary>>, line, column+1, List.to_atom(acc)}
   end
-  def interpolation(<<?}, rest::binary>>, line, column, :code, acc, 0) do
-    {<<rest::binary>>, line, column+1, acc}
+  def interpolation(<<?}, rest::binary>>, binding, line, column, :code, acc, 0) do
+    {<<rest::binary>>, line, column+1, Code.eval_string("#{acc}", binding)}
   end
-  def interpolation(<<?{, rest::binary>>, line, column, _type, acc, n) do
-    interpolation(rest, line, column, :code, acc ++ [?{], n+1)
+  def interpolation(<<?{, rest::binary>>, binding, line, column, _type, acc, n) do
+    interpolation(rest, binding, line, column, :code, acc ++ [?{], n+1)
   end
-  def interpolation(<<?}, rest::binary>>, line, column, type, acc, n) do
-    interpolation(rest, line, column+1, type, acc ++ [?}], n-1)
+  def interpolation(<<?}, rest::binary>>, binding, line, column, type, acc, n) do
+    interpolation(rest, binding, line, column+1, type, acc ++ [?}], n-1)
   end
-  def interpolation(<<v, rest::binary>>, line, column, :var = type, acc, n) when v in ?a..?z or v in ?A..?Z or (v == ?_ and acc != [])  do
-    interpolation(rest, line+1, column, type, acc ++ [v], n)
+  def interpolation(<<v, rest::binary>>, binding, line, column, :var = type, acc, n) when v in ?0..?9 and acc != []  do
+    interpolation(rest, binding, line+1, column, type, acc ++ [v], n)
   end
-  def interpolation(<<?\n, rest::binary>>, line, column, _type, acc, n) do
-    interpolation(rest, line+1, column, :code, acc ++ [?\n], n)
+  def interpolation(<<v, rest::binary>>, binding, line, column, :var = type, acc, n) when v in ?a..?z or v in ?A..?Z or (v == ?_ and acc != [])  do
+    interpolation(rest, binding, line+1, column, type, acc ++ [v], n)
   end
-  def interpolation(<<v, rest::binary>>, line, column, _type, acc, n) do
-    interpolation(rest, line, column+1, :code, acc ++ [v], n)
+  def interpolation(<<?\n, rest::binary>>, binding, line, column, _type, acc, n) do
+    interpolation(rest, binding, line+1, column, :code, acc ++ [?\n], n)
+  end
+  def interpolation(<<v, rest::binary>>, binding, line, column, _type, acc, n) do
+    interpolation(rest, binding, line, column+1, :code, acc ++ [v], n)
   end
 end
