@@ -9,6 +9,14 @@ defmodule SQL.Parser do
   def context(?[), do: :"[]"
   def context(?(), do: :"()"
 
+  def type(%param{}), do: param
+  def type(param) when is_float(param), do: :float
+  def type(param) when is_integer(param), do: :integer
+  def type(param) when is_map(param), do: :map
+  def type(param) when is_list(param), do: {:list, Enum.uniq(Enum.map(param, &type/1))}
+  def type(param) when is_binary(param), do: :string
+  def type(_param), do: nil
+
   def type(?., :integer), do: :float
   def type(b, type) when b in ?0..?9 and type in ~w[nil integer float]a, do: type || :integer
   def type(_b, _type), do: :ident
@@ -229,12 +237,12 @@ defmodule SQL.Parser do
         parse(rest, binary, opts, end_line, end_column, nil, data, unit ++ [{:"\#{}", [line: line, column: column, end_line: end_line, end_column: end_column], [result]}], context, metadata, acc, root)
       {rest, end_line, end_column, result} when is_atom(result) ->
         if param = binding[result] do
-          parse(rest, binary, update_in(opts, [:params], &(&1++[param])), end_line, end_column, nil, data, unit ++ [{:binding, [line: line, column: column, end_line: end_line, end_column: end_column], [length(opts[:params])]}], context, metadata, acc, root)
+          parse(rest, binary, update_in(opts, [:params], &(&1++[param])), end_line, end_column, nil, data, unit ++ [{:binding, [type: type(param), line: line, column: column, end_line: end_line, end_column: end_column], [length(opts[:params])+1]}], context, metadata, acc, root)
         else
           raise ArgumentError, "The variable #{result} is not defined"
         end
-      {rest, end_line, end_column, {result, _}} ->
-        parse(rest, binary, update_in(opts, [:params], &(&1++[result])), end_line, end_column, nil, data, unit ++ [{:binding, [line: line, column: column, end_line: end_line, end_column: end_column], [length(opts[:params])]}], context, metadata, acc, root)
+      {rest, end_line, end_column, {param, _}} ->
+        parse(rest, binary, update_in(opts, [:params], &(&1++[param])), end_line, end_column, nil, data, unit ++ [{:binding, [type: type(param), line: line, column: column, end_line: end_line, end_column: end_column], [length(opts[:params])+1]}], context, metadata, acc, root)
     end
   end
   def parse(<<?), rest::binary>>, _binary, opts, line, column, type, data, unit, :"()" = context, metadata, acc, root) do

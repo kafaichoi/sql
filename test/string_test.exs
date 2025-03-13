@@ -195,20 +195,26 @@ defmodule SQL.StringTest do
       assert ["id"] == var2.params
       sql = ~SQL[select #{var2}, #{var1}]
       assert [var2, 1] == sql.params
-      assert "select $0, $1" == to_string(sql)
+      assert "select $1, $2" == to_string(sql)
     end
 
     test ". syntax" do
       map = %{k: "v"}
       sql = ~SQL[select #{map.k <> "v"}]
       assert ["vv"] == sql.params
-      assert "select $0" == to_string(sql)
+      assert "select $1" == to_string(sql)
     end
 
     test "code" do
       sql = ~SQL[select #{0}, #{%{k: 1}}]
       assert [0, %{k: 1}] == sql.params
-      assert "select $0, $1" == to_string(sql)
+      assert "select $1, $2" == to_string(sql)
+    end
+
+    test "in" do
+      sql = ~SQL"select #{1} in #{[1, 2]}"
+      assert [1, [1, 2]] == sql.params
+      assert "select $1 = ANY($2)" == to_string(sql)
     end
   end
 

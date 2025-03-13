@@ -26,6 +26,9 @@ defmodule SQL.String do
   def token_to_sql({:"\#{}", _, [value]}, _mod) do
     "\#{#{value}}"
   end
+  def token_to_sql({:in, _, [right, {:binding, _, _} = left]}, mod) do
+    "#{mod.token_to_sql(right)} = ANY(#{mod.token_to_sql(left)})"
+  end
   def token_to_sql({tag, _, value}, mod) when tag in ~w[; ,]a do
     "#{mod.token_to_sql(value)}#{mod.token_to_sql(tag)}"
   end

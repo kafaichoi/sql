@@ -42,7 +42,7 @@ defmodule SQLTest do
 
   test "to_sql/1" do
     email = "john@example.com"
-    assert {"select id, email from users where email = $0", ["john@example.com"]} == to_sql(~SQL"""
+    assert {"select id, email from users where email = $1", ["john@example.com"]} == to_sql(~SQL"""
     select id, email
     where email = #{email}
     from users
@@ -51,7 +51,7 @@ defmodule SQLTest do
 
   test "can parse multiple queries" do
     email = "john@example.com"
-    assert {"select id, email where email = $0 from users; select id from users", [email]} == to_sql(~SQL"""
+    assert {"select id, email where email = $1 from users; select id from users", [email]} == to_sql(~SQL"""
     select id, email
     where email = #{email}
     from users;
@@ -282,8 +282,8 @@ defmodule SQLTest do
 
   test "interpolation" do
     var = 1
-    assert [{:select, _, [{:binding, _, [0]}]}] = ~SQL[select #{var}].tokens
-    assert [{:select, _, [{:binding, _, [0]}]}] = ~SQL[select #{
+    assert [{:select, _, [{:binding, _, [1]}]}] = ~SQL[select #{var}].tokens
+    assert [{:select, _, [{:binding, _, [1]}]}] = ~SQL[select #{
       {}
       }].tokens
   end
