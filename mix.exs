@@ -16,7 +16,7 @@ defmodule SQL.MixProject do
       name: "SQL",
       docs: docs(),
       package: package(),
-      aliases: [bench: "run bench.exs"]
+      aliases: ["sql.bench": "run bench.exs"]
     ]
   end
 
@@ -44,6 +44,7 @@ defmodule SQL.MixProject do
       {:ecto_sql, "~> 3.12", only: [:dev, :test]},
       {:ex_doc, "~> 0.37", only: :dev},
       {:postgrex, ">= 0.0.0", only: [:dev, :test]},
+      {:yamerl, ">= 0.0.0", only: [:dev, :test]},
     ]
   end
 end
