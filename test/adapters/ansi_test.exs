@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2025 DBVisor
 
-defmodule SQL.StringTest do
+defmodule SQL.Adapters.ANSITest do
   use ExUnit.Case
-  import SQL
+  use SQL, adapter: SQL.Adapters.ANSI
 
   describe "with" do
     test "recursive" do

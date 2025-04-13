@@ -13,6 +13,7 @@ defmodule SQL do
       @doc false
       @behaviour SQL
       import SQL
+      def config, do: unquote(opts)
       def token_to_sql(token), do: token_to_sql(token)
       defoverridable token_to_sql: 1
     end
@@ -23,6 +24,7 @@ defmodule SQL do
   Returns a SQL string for a given token.
   """
   @doc since: "0.1.0"
+  @doc deprecated: "Use SQL.Token.token_to_string/1 instead"
   @callback token_to_sql(token :: {atom, keyword, list}) :: String.t()
 
   defstruct [:tokens, :query, :params, :module]
@@ -40,15 +42,16 @@ defmodule SQL do
 
   @doc false
   def build(right, {:<<>>, meta, _} = left, _modifiers, env) do
-    quote bind_quoted: [right: Macro.unpipe(right), left: left, meta: Macro.escape({meta[:line], meta[:column] || 0, env.file})] do
+    quote bind_quoted: [right: Macro.unpipe(right), left: left, meta: Macro.escape({meta[:line], meta[:column] || 0, env.file}), e: Macro.escape(env)] do
       {t, p} = Enum.reduce(right, {[], []}, fn
         {[], 0}, acc -> acc
+        {v, 0}, {:ok, opts, _, _, _, _, tokens} -> {tokens ++ v.tokens, opts[:params] ++ v.params}
         {v, 0}, {tokens, params} -> {tokens ++ v.tokens, params ++ v.params}
         end)
-      {:ok, tokens, params} = SQL.Parser.parse(left, binding(), meta, p)
-      t ++ tokens
+      {:ok, opts, _, _, _, _, tokens} = SQL.Lexer.lex(left, binding(), meta, p)
+      t ++ SQL.Parser.parse(tokens)
       |> SQL.to_query()
-      |> Map.merge(%{module: __MODULE__, params: params})
+      |> Map.merge(%{module: __MODULE__, params: opts[:params]})
     end
   end
 
@@ -67,15 +70,22 @@ defmodule SQL do
   end
 
   @doc false
+  @doc since: "0.1.0"
   def parse(binary) do
-    {:ok, tokens, []} = SQL.Parser.parse(binary, false, {1, 0, nil})
-    to_query(tokens)
+    {:ok, _opts, _, _, _, _, tokens} = SQL.Lexer.lex(binary, false, {1, 0, nil}, [])
+    tokens
+    |> SQL.Parser.parse()
+    |> to_query()
   end
 
   @doc false
-  @acc ~w[; with update delete select fetch from join where group having window except intersect union order limit offset lock]a
+  @doc since: "0.1.0"
+  @acc ~w[for create drop insert alter with update delete select set fetch from join where group having window except intersect union order limit offset lock colon in declare start grant revoke commit rollback open close comment comments into]a
   def to_query([value | _] = tokens) when is_tuple(value) and elem(value, 0) in @acc do
     struct(SQL, tokens: tokens, query: Enum.reduce(@acc, [], fn key, acc -> acc ++ for {k, meta, v} <- Enum.filter(tokens, &(elem(&1, 0) == key)), do: {k, meta, Enum.map(v, &to_query/1)} end))
+  end
+  def to_query({:parens = tag, meta, values}) do
+    {tag, meta, to_query(values)}
   end
   def to_query({tag, meta, values}) do
     {tag, meta, Enum.map(values, &to_query/1)}
@@ -87,25 +97,28 @@ defmodule SQL do
     token
   end
 
-  @doc false
-  def __token_to_sql__(sql) do
-    if Kernel.function_exported?(sql.module, :token_to_sql, 1) do
-      &sql.module.token_to_sql/1
-    else
-      &SQL.String.token_to_sql/1
-    end
-  end
-
   defimpl Inspect, for: SQL do
     def inspect(sql, _opts) do
-      fun = SQL.__token_to_sql__(sql)
-      Enum.reduce(0..length(sql.params), to_string(sql), &String.replace(&2, fun.({:binding, [], [&1]}), fun.(Enum.at(sql.params, &1))))
+      if Kernel.function_exported?(sql.module, :config, 0) do
+        Enum.reduce(0..length(sql.params), to_string(sql), &String.replace(&2, sql.module.config()[:adapter].token_to_string({:binding, [], [&1]}), sql.module.config()[:adapter].token_to_string(Enum.at(sql.params, &1)), global: false))
+      else
+        Enum.reduce(0..length(sql.params), to_string(sql), &String.replace(&2, SQL.String.token_to_sql({:binding, [], [&1]}), SQL.String.token_to_sql(Enum.at(sql.params, &1))))
+      end
     end
   end
 
   defimpl String.Chars, for: SQL do
     def to_string(sql) do
-      Enum.map_join(sql.query, " ", &SQL.__token_to_sql__(sql).(&1))
+      cond do
+        Kernel.function_exported?(sql.module, :config, 0) -> Enum.map(sql.query, &sql.module.config()[:adapter].token_to_string(&1))
+        Kernel.function_exported?(sql.module, :token_to_string, 2) -> Enum.map(sql.query, &sql.module.token_to_string(&1))
+        true -> Enum.map(sql.query, &SQL.String.token_to_sql(&1))
+      end
+      |> Enum.reduce("", fn
+        v, "" -> v
+        <<";", _::binary>> = v, acc -> acc <> v
+        v, acc -> acc <> " " <> v
+      end)
     end
   end
 end

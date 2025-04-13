@@ -7,12 +7,12 @@ defmodule SQLTest do
 
   def from() do
     var = "users"
-    ~SQL[from #{var} u]
+    ~SQL[from {{var}} u]
   end
 
   def where(sql) do
     var = "john@example.com"
-    sql |> ~SQL[where u.email = #{var}]
+    sql |> ~SQL[where u.email = {{var}}]
   end
 
   describe "composable" do
@@ -42,18 +42,18 @@ defmodule SQLTest do
 
   test "to_sql/1" do
     email = "john@example.com"
-    assert {"select id, email from users where email = $1", ["john@example.com"]} == to_sql(~SQL"""
+    assert {"select id, email from users where email = ?", ["john@example.com"]} == to_sql(~SQL"""
     select id, email
-    where email = #{email}
+    where email = {{email}}
     from users
     """)
   end
 
   test "can parse multiple queries" do
     email = "john@example.com"
-    assert {"select id, email where email = $1 from users; select id from users", [email]} == to_sql(~SQL"""
+    assert {"select id, email from users where email = ?; select id from users", [email]} == to_sql(~SQL"""
     select id, email
-    where email = #{email}
+    where email = {{email}}
     from users;
     select id from users
     """)
@@ -70,12 +70,21 @@ defmodule SQLTest do
       end
     end
 
-    test "missing }" do
+    test "missing ]" do
       assert_raise TokenMissingError, ~r"token missing on", fn ->
-        ~SQL[select id in #{1].tokens
+        ~SQL{select id in ([1)}.tokens
       end
       assert_raise TokenMissingError, ~r"token missing on", fn ->
-        ~SQL[select id from users join orgs on #{id].tokens
+        ~SQL{select id from users join orgs on ([1)}.tokens
+      end
+    end
+
+    test "missing }" do
+      assert_raise TokenMissingError, ~r"token missing on", fn ->
+        ~SQL[select id in {{1].tokens
+      end
+      assert_raise TokenMissingError, ~r"token missing on", fn ->
+        ~SQL[select id from users join orgs on {{id].tokens
       end
     end
 
@@ -100,57 +109,57 @@ defmodule SQLTest do
 
   describe "with" do
     test "recursive" do
-      assert [{:with, _, [{:as, _, [{:recursive, _, [{:ident, _, [~c"temp"]}, {:"()", _, [{:",", _, [{:ident, _, [~c"n"]}]}, {:ident, _, [~c"fact"]}]}]}, {:"()", _, [{:union, _, [[{:select, _, [{:",", _, [{:integer, _, [~c"0"]}]}, {:integer, _, [~c"1"]}]}], {:all, _, [{:select, _, [{:",", _, [{:+, _, [{:ident, _, [~c"n"]}, {:integer, _, [~c"1"]}]}]}, {:*, _, [{:"()", _, [{:+, _, [{:ident, _, [~c"n"]}, {:integer, _, [~c"1"]}]}]}, {:ident, _, [~c"fact"]}]}]}, {:from, _, [{:ident, _, [~c"temp"]}]}, {:where, _, [{:<, _, [{:ident, _, [~c"n"]}, {:integer, _, [~c"9"]}]}]}]}]}]}]}]}] = ~SQL[with recursive temp (n, fact) as (select 0, 1 union all select n+1, (n+1)*fact from temp where n < 9)].tokens
+      assert [{:with, _, [{:as, _, [{:recursive, _, [{:ident, _, [~c"temp"]}, {:parens, _, [{:ident, _, [~c"n"]}, {:comma, _, [{:ident, _, [~c"fact"]}]}]}]}, {:parens, _, [{:union, _, [[{:select, _, [{:integer, _, [~c"0"]}, {:comma, _, [{:integer, _, [~c"1"]}]}]}], [{:all, _, [{:select, _, [{:+, _, [{:ident, _, [~c"n"]}, {:integer, _, [~c"1"]}]}, {:comma, _, [{:*, _, [{:parens, _, [{:+, _, [{:ident, _, [~c"n"]}, {:integer, _, [~c"1"]}]}]}, {:ident, _, [~c"fact"]}]}]}]}, {:from, _, [{:ident, _, [~c"temp"]}]}, {:where, _, [{:<, _, [{:ident, _, [~c"n"]}, {:integer, _, [~c"9"]}]}]}]}]]}]}]}]}] = ~SQL[with recursive temp (n, fact) as (select 0, 1 union all select n+1, (n+1)*fact from temp where n < 9)].tokens
     end
 
     test "regular" do
-      assert [{:with, _, [{:as, _, [[{:ident, _, [~c"temp"]}, {:"()", _, [{:",", _, [{:ident, _, [~c"n"]}]}, {:ident, _, [~c"fact"]}]}], {:"()", _, [{:union, _, [[{:select, _, [{:",", _, [{:integer, _, [~c"0"]}]}, {:integer, _, [~c"1"]}]}], {:all, _, [{:select, _, [{:",", _, [{:+, _, [{:ident, _, [~c"n"]}, {:integer, _, [~c"1"]}]}]}, {:*, _, [{:"()", _, [{:+, _, [{:ident, _, [~c"n"]}, {:integer, _, [~c"1"]}]}]}, {:ident, _, [~c"fact"]}]}]}, {:from, _, [{:ident, _, [~c"temp"]}]}, {:where, _, [{:<, _, [{:ident, _, [~c"n"]}, {:integer, _, [~c"9"]}]}]}]}]}]}]}]}] = ~SQL[with temp (n, fact) as (select 0, 1 union all select n+1, (n+1)*fact from temp where n < 9)].tokens
+      assert [{:with, _, [{:as, _, [[{:ident, _, [~c"temp"]}, {:parens, _, [{:ident, _, [~c"n"]}, {:comma, _, [{:ident, _, [~c"fact"]}]}]}], {:parens, _, [{:union, _, [[{:select, _, [{:integer, _, [~c"0"]}, {:comma, _, [{:integer, _, [~c"1"]}]}]}], [{:all, _, [{:select, _, [{:+, _, [{:ident, _, [~c"n"]}, {:integer, _, [~c"1"]}]}, {:comma, _, [{:*, _, [{:parens, _, [{:+, _, [{:ident, _, [~c"n"]}, {:integer, _, [~c"1"]}]}]}, {:ident, _, [~c"fact"]}]}]}]}, {:from, _, [{:ident, _, [~c"temp"]}]}, {:where, _, [{:<, _, [{:ident, _, [~c"n"]}, {:integer, _, [~c"9"]}]}]}]}]]}]}]}]}] = ~SQL[with temp (n, fact) as (select 0, 1 union all select n+1, (n+1)*fact from temp where n < 9)].tokens
     end
   end
 
   describe "combinations" do
     test "except" do
-      assert [{:except, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}] = ~SQL[(select id from users) except (select id from users)].tokens
-      assert [{:except, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]]}] = ~SQL[(select id from users) except select id from users].tokens
-      assert [{:except, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], {:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}] = ~SQL[select id from users except (select id from users)].tokens
+      assert [{:except, _, [[{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}], [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]]}] = ~SQL[(select id from users) except (select id from users)].tokens
+      assert [{:except, _, [[{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}], [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]]}] = ~SQL[(select id from users) except select id from users].tokens
+      assert [{:except, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]]}] = ~SQL[select id from users except (select id from users)].tokens
       assert [{:except, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]]}] = ~SQL[select id from users except select id from users].tokens
 
-      assert [{:except, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:all, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}]}] = ~SQL[(select id from users) except all (select id from users)].tokens
-      assert [{:except, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:all, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}] = ~SQL[(select id from users) except all select id from users].tokens
-      assert [{:except, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], {:all, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}]}] = ~SQL[select id from users except all (select id from users)].tokens
-      assert [{:except, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], {:all, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}] = ~SQL[select id from users except all select id from users].tokens
+      assert [{:except, _, [[{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}], [{:all, _, [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}]]}] = ~SQL[(select id from users) except all (select id from users)].tokens
+      assert [{:except, _, [[{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}], [{:all, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]]}] = ~SQL[(select id from users) except all select id from users].tokens
+      assert [{:except, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], [{:all, _, [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}]]}] = ~SQL[select id from users except all (select id from users)].tokens
+      assert [{:except, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], [{:all, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]]}] = ~SQL[select id from users except all select id from users].tokens
     end
 
     test "intersect" do
-      assert [{:intersect, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}] = ~SQL[(select id from users) intersect (select id from users)].tokens
-      assert [{:intersect, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]]}] = ~SQL[(select id from users) intersect select id from users].tokens
-      assert [{:intersect, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], {:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}] = ~SQL[select id from users intersect (select id from users)].tokens
+      assert [{:intersect, _, [[{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}], [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]]}] = ~SQL[(select id from users) intersect (select id from users)].tokens
+      assert [{:intersect, _, [[{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}], [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]]}] = ~SQL[(select id from users) intersect select id from users].tokens
+      assert [{:intersect, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]]}] = ~SQL[select id from users intersect (select id from users)].tokens
       assert [{:intersect, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]]}] = ~SQL[select id from users intersect select id from users].tokens
 
-      assert [{:intersect, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:all, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}]}] = ~SQL[(select id from users) intersect all (select id from users)].tokens
-      assert [{:intersect, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:all, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}] = ~SQL[(select id from users) intersect all select id from users].tokens
-      assert [{:intersect, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], {:all, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}]}] = ~SQL[select id from users intersect all (select id from users)].tokens
-      assert [{:intersect, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], {:all, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}] = ~SQL[select id from users intersect all select id from users].tokens
+      assert [{:intersect, _, [[{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}], [{:all, _, [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}]]}] = ~SQL[(select id from users) intersect all (select id from users)].tokens
+      assert [{:intersect, _, [[{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}], [{:all, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]]}] = ~SQL[(select id from users) intersect all select id from users].tokens
+      assert [{:intersect, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], [{:all, _, [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}]]}] = ~SQL[select id from users intersect all (select id from users)].tokens
+      assert [{:intersect, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], [{:all, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]]}] = ~SQL[select id from users intersect all select id from users].tokens
     end
 
     test "union" do
-      assert [{:union, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}] = ~SQL[(select id from users) union (select id from users)].tokens
-      assert [{:union, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]]}] = ~SQL[(select id from users) union select id from users].tokens
-      assert [{:union, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], {:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}] = ~SQL[select id from users union (select id from users)].tokens
+      assert [{:union, _, [[{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}], [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]]}] = ~SQL[(select id from users) union (select id from users)].tokens
+      assert [{:union, _, [[{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}], [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]]}] = ~SQL[(select id from users) union select id from users].tokens
+      assert [{:union, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]]}] = ~SQL[select id from users union (select id from users)].tokens
       assert [{:union, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]]}] = ~SQL[select id from users union select id from users].tokens
 
-      assert [{:union, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:all, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}]}] = ~SQL[(select id from users) union all (select id from users)].tokens
-      assert [{:union, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:all, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}] = ~SQL[(select id from users) union all select id from users].tokens
-      assert [{:union, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], {:all, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}]}] = ~SQL[select id from users union all (select id from users)].tokens
-      assert [{:union, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], {:all, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}] = ~SQL[select id from users union all select id from users].tokens
+      assert [{:union, _, [[{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}], [{:all, _, [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}]]}] = ~SQL[(select id from users) union all (select id from users)].tokens
+      assert [{:union, _, [[{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}], [{:all, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]]}] = ~SQL[(select id from users) union all select id from users].tokens
+      assert [{:union, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], [{:all, _, [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]}]]}] = ~SQL[select id from users union all (select id from users)].tokens
+      assert [{:union, _, [[{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}], [{:all, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}]]}] = ~SQL[select id from users union all select id from users].tokens
     end
   end
 
   describe "query" do
     test "select" do
       assert [{:select, _, [{:ident, _, [~c"id"]}]}] = ~SQL[select id].tokens
-      assert [{:select, _, [{:",", _, [{:ident, _, [~c"id"]}]}, {:as, _, [{:ident, _, [~c"id"]}, {:ident, _, [~c"di"]}]}]}] = ~SQL[select id, id as di].tokens
-      assert [{:select, _, [{:",", _, [{:ident, _, [~c"id"]}]}, {:as, _, [{:"()", _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:ident, _, [~c"di"]}]}]}] = ~SQL[select id, (select id from users) as di].tokens
+      assert [{:select, _, [{:ident, _, [~c"id"]}, {:comma, _, [{:as, _, [{:ident, _, [~c"id"]}, {:ident, _, [~c"di"]}]}]}]}] = ~SQL[select id, id as di].tokens
+      assert [{:select, _, [{:ident, _, [~c"id"]}, {:comma, _, [{:as, _, [{:parens, _, [{:select, _, [{:ident, _, [~c"id"]}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:ident, _, [~c"di"]}]}]}]}] = ~SQL[select id, (select id from users) as di].tokens
       assert [{:select, _, [{:ident, _, [~c"unknownn"]}]}] = ~SQL[select unknownn].tokens
       assert [{:select, _, [{:ident, _, [~c"truee"]}]}] = ~SQL[select truee].tokens
       assert [{:select, _, [{:ident, _, [~c"falsee"]}]}] = ~SQL[select falsee].tokens
@@ -160,7 +169,7 @@ defmodule SQLTest do
       assert [{:select, _, [{:ident, _, [~c"ascc"]}]}] = ~SQL[select ascc].tokens
       assert [{:select, _, [{:ident, _, [~c"descc"]}]}] = ~SQL[select descc].tokens
       assert [{:select, _, [{:distinct, _, []}, {:ident, _, [~c"id"]}]}] = ~SQL[select distinct id].tokens
-      assert [{:select, _, [{:distinct, _, [{:on, _, [{:"()", _, [{:",", _, [{:ident, _, [~c"id"]}]}, {:ident, _, [~c"users"]}]}]}]}, {:ident, _, [~c"id"]}]}] = ~SQL[select distinct on (id, users) id].tokens
+      assert [{:select, _, [{:distinct, _, [{:on, _, [{:parens, _, [{:ident, _, [~c"id"]}, {:comma, _, [{:ident, _, [~c"users"]}]}]}]}]}, {:ident, _, [~c"id"]}]}] = ~SQL[select distinct on (id, users) id].tokens
     end
 
     test "from" do
@@ -170,19 +179,20 @@ defmodule SQLTest do
     end
 
     test "join" do
-      assert [{:join, _, [[{:inner, _, []}], {:ident, _, [~c"users"]}]}] = ~SQL[inner join users].tokens
+      assert [{:join, _, [[inner: _], [{:ident, _, [~c"users"]}]]}] = ~SQL[inner join users].tokens
       assert [{:join, _, [{:ident, _, [~c"users"]}]}] = ~SQL[join users].tokens
-      assert [{:join, _, [[{:left, _, []}, {:outer, _, []}], {:ident, _, [~c"users"]}]}] = ~SQL[left outer join users].tokens
-      assert [{:join, _, [[{:left, _, []}], {:ident, _, [~c"users"]}]}] = ~SQL[left join users].tokens
-      assert [{:join, _, [[{:natural, _, []}], {:ident, _, [~c"users"]}]}] = ~SQL[natural join users].tokens
-      assert [{:join, _, [[{:full, _, []}], {:ident, _, [~c"users"]}]}] = ~SQL[full join users].tokens
-      assert [{:join, _, [[{:cross, _, []}], {:ident, _, [~c"users"]}]}] = ~SQL[cross join users].tokens
+      assert [{:join, _, [[left: _, outer: _], [{:ident, _, [~c"users"]}]]}] = ~SQL[left outer join users].tokens
+      assert [{:join, _, [[left: _], [{:ident, _, [~c"users"]}]]}] = ~SQL[left join users].tokens
+      assert [{:join, _, [[natural: _], [{:ident, _, [~c"users"]}]]}] = ~SQL[natural join users].tokens
+      assert [{:join, _, [[natural: _, left: _, outer: _], [{:ident, _, [~c"users"]}]]}] = ~SQL[natural left outer join users].tokens
+      assert [{:join, _, [[full: _], [{:ident, _, [~c"users"]}]]}] = ~SQL[full join users].tokens
+      assert [{:join, _, [[cross: _], [{:ident, _, [~c"users"]}]]}] = ~SQL[cross join users].tokens
       assert [{:join, _, [{:ident, _, [~c"users"]}, {:ident, _, [~c"u"]}]}] = ~SQL[join users u].tokens
       assert [{:join, _, [{:on, _, [{:ident, _, [~c"users"]}, {:=, _, [{:ident, _, [~c"id"]}, {:ident, _, [~c"id"]}]}]}]}]  = ~SQL[join users on id = id].tokens
       assert [{:join, _, [{:on, _, [[{:ident, _, [~c"users"]}, {:ident, _, [~c"u"]}], {:=, _, [{:ident, _, [~c"id"]}, {:ident, _, [~c"id"]}]}]}]}] = ~SQL[join users u on id = id].tokens
-      assert [{:join, _, [{:on, _, [{:ident, _, [~c"users"]}, {:"()", _, [{:=, _, [{:ident, _, [~c"id"]}, {:ident, _, [~c"id"]}]}]}]}]}] = ~SQL[join users on (id = id)].tokens
-      assert [{:join, _, [{:on, _, [{:"()", _, [{:select, _, [{:*, _, []}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:"()", _, [{:=, _, [{:ident, _, [~c"id"]}, {:ident, _, [~c"id"]}]}]}]}]}] = ~SQL[join (select * from users) on (id = id)].tokens
-      assert [{:join, _, [{:on, _, [[{:"()", _, [{:select, _, [{:*, _, []}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:ident, _, [~c"u"]}], {:"()", _, [{:=, _, [{:ident, _, [~c"id"]}, {:ident, _, [~c"id"]}]}]}]}]}] = ~SQL[join (select * from users) u on (id = id)].tokens
+      assert [{:join, _, [{:on, _, [{:ident, _, [~c"users"]}, {:parens, _, [{:=, _, [{:ident, _, [~c"id"]}, {:ident, _, [~c"id"]}]}]}]}]}] = ~SQL[join users on (id = id)].tokens
+      assert [{:join, _, [{:on, _, [{:parens, _, [{:select, _, [{:*, _, _}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:parens, _, [{:=, _, [{:ident, _, [~c"id"]}, {:ident, _, [~c"id"]}]}]}]}]}] = ~SQL[join (select * from users) on (id = id)].tokens
+      assert [{:join, _, [{:on, _, [[{:parens, _, [{:select, _, [{:*, _, _}]}, {:from, _, [{:ident, _, [~c"users"]}]}]}, {:ident, _, [~c"u"]}], {:parens, _, [{:=, _, [{:ident, _, [~c"id"]}, {:ident, _, [~c"id"]}]}]}]}]}] = ~SQL[join (select * from users) u on (id = id)].tokens
     end
 
     test "where" do
@@ -196,7 +206,7 @@ defmodule SQLTest do
     test "group by" do
       assert [{:group, _, [{:by, _, [{:ident, _, [~c"id"]}]}]}] = ~SQL[group by id].tokens
       assert [{:group, _, [{:by, _, [{:., _, [{:ident, _, [~c"users"]}, {:ident, _, [~c"id"]}]}]}]}] = ~SQL[group by users.id].tokens
-      assert [{:group, _, [{:by, _, [{:",", _, [{:ident, _, [~c"id"]}]}, {:., _, [{:ident, _, [~c"users"]}, {:ident, _, [~c"id"]}]}]}]}] = ~SQL[group by id, users.id].tokens
+      assert [{:group, _, [{:by, _, [{:ident, _, [~c"id"]}, {:comma, _, [{:., _, [{:ident, _, [~c"users"]}, {:ident, _, [~c"id"]}]}]}]}]}] = ~SQL[group by id, users.id].tokens
     end
 
     test "having" do
@@ -208,7 +218,9 @@ defmodule SQLTest do
     test "order by" do
       assert [{:order, _, [{:by, _, [{:ident, _, [~c"id"]}]}]}] = ~SQL[order by id].tokens
       assert [{:order, _, [{:by, _, [{:., _, [{:ident, _, [~c"users"]}, {:ident, _, [~c"id"]}]}]}]}] = ~SQL[order by users.id].tokens
-      assert [{:order, _, [{:by, _, [{:",", _, [{:ident, _, [~c"id"]}]}, {:",", _, [{:., _, [{:ident, _, [~c"users"]}, {:ident, _, [~c"id"]}]}]}, {:",", _, [{:asc, _, [{:., _, [{:ident, _, [~c"users"]}, {:ident, _, [~c"id"]}]}]}]}, {:desc, _, [{:ident, _, [~c"id"]}]}]}]}] = ~SQL[order by id, users.id, users.id asc, id desc].tokens
+      assert [{:order, _, [{:by, _, [{:., _, [{:ident, _, [~c"users"]}, {:ident, _, [~c"id"]}]}, {:asc, _, _}, {:nulls, _, _}, {:first, _, _}]}]}] = ~SQL[order by users.id asc nulls first].tokens
+      assert [{:order, _, [{:by, _, [{:., _, [{:ident, _, [~c"users"]}, {:ident, _, [~c"id"]}]}, {:desc, _, _}, {:nulls, _, _}, {:last, _, _}]}]}] = ~SQL[order by users.id desc nulls last].tokens
+      assert [{:order, _, [{:by, _, [{:ident, _, [~c"id"]}, {:comma, _, [{:., _, [{:ident, _, [~c"users"]}, {:ident, _, [~c"id"]}]}]}, {:comma, _, [{:., _, [{:ident, _, [~c"users"]}, {:ident, _, [~c"id"]}]}, {:asc, _, _}]},  {:comma, _, [{:ident, _, [~c"id"]}, {:desc, _, _}]}]}]}] = ~SQL[order by id, users.id, users.id asc, id desc].tokens
     end
 
     test "offset" do
@@ -235,20 +247,20 @@ defmodule SQLTest do
       assert [{:fetch, _, [{:backward, _, [{:integer, _, [~c"1"]}]}]}, {:from, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch backward 1 from users].tokens
       assert [{:fetch, _, [{:backward, _, [{:all, _, []}]}]}, {:from, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch backward all from users].tokens
 
-      assert [{:fetch, _, [{:in, _, [{:next, _, []}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch next in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:prior, _, []}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch prior in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:first, _, []}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch first in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:last, _, []}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch last in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:absolute, _, [{:integer, _, [~c"1"]}]}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch absolute 1 in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:relative, _, [{:integer, _, [~c"1"]}]}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch relative 1 in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:integer, _, [~c"1"]}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch 1 in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:all, _, []}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch all in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:forward, _, []}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch forward in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:forward, _, [{:integer, _, [~c"1"]}]}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch forward 1 in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:forward, _, [{:all, _, []}]}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch forward all in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:backward, _, []}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch backward in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:backward, _, [{:integer, _, [~c"1"]}]}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch backward 1 in users].tokens
-      assert [{:fetch, _, [{:in, _, [{:backward, _, [{:all, _, []}]}, {:ident, _, [~c"users"]}]}]}] = ~SQL[fetch backward all in users].tokens
+      assert [{:fetch, _, [{:next, _, []}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch next in users].tokens
+      assert [{:fetch, _, [{:prior, _, []}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch prior in users].tokens
+      assert [{:fetch, _, [{:first, _, []}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch first in users].tokens
+      assert [{:fetch, _, [{:last, _, []}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch last in users].tokens
+      assert [{:fetch, _, [{:absolute, _, [{:integer, _, [~c"1"]}]}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch absolute 1 in users].tokens
+      assert [{:fetch, _, [{:relative, _, [{:integer, _, [~c"1"]}]}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch relative 1 in users].tokens
+      assert [{:fetch, _, [{:integer, _, [~c"1"]}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch 1 in users].tokens
+      assert [{:fetch, _, [{:all, _, []}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch all in users].tokens
+      assert [{:fetch, _, [{:forward, _, []}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch forward in users].tokens
+      assert [{:fetch, _, [{:forward, _, [{:integer, _, [~c"1"]}]}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch forward 1 in users].tokens
+      assert [{:fetch, _, [{:forward, _, [{:all, _, []}]}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch forward all in users].tokens
+      assert [{:fetch, _, [{:backward, _, []}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch backward in users].tokens
+      assert [{:fetch, _, [{:backward, _, [{:integer, _, [~c"1"]}]}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch backward 1 in users].tokens
+      assert [{:fetch, _, [{:backward, _, [{:all, _, []}]}]}, {:in, _, [{:ident, _, [~c"users"]}]}] = ~SQL[fetch backward all in users].tokens
     end
   end
 
@@ -266,26 +278,26 @@ defmodule SQLTest do
     end
 
     test "identifier" do
-      assert [{:select, _, [{:., _, [{:., _, [{:"[]", _, [{:ident, _, [~c"db"]}]}, {:"[]", _, [{:ident, _, [~c"users"]}]}]}, {:"[]", _, [{:ident, _, [~c"id"]}]}]}]}] = ~SQL{select [db].[users].[id]}.tokens
-      assert [{:select, _, [{:., _, [{:., _, [{:"", _, [{:ident, _, [~c"db"]}]}, {:"", _, [{:ident, _, [~c"users"]}]}]}, {:"", _, [{:ident, _, [~c"id"]}]}]}]}] = ~SQL[select "db"."users"."id"].tokens
+      assert [{:select, _, [{:., _, [{:., _, [{:bracket, _, [{:ident, _, [~c"db"]}]}, {:bracket, _, [{:ident, _, [~c"users"]}]}]}, {:bracket, _, [{:ident, _, [~c"id"]}]}]}]}] = ~SQL{select [db].[users].[id]}.tokens
+      assert [{:select, _, [{:., _, [{:., _, [{:double_quote, _, [~c"db"]}, {:double_quote, _, [~c"users"]}]}, {:double_quote, _, [~c"id"]}]}]}] = ~SQL[select "db"."users"."id"].tokens
       assert [{:select, _, [{:., _, [{:., _, [{:ident, _, [~c"db"]}, {:ident, _, [~c"users"]}]}, {:ident, _, [~c"id"]}]}]}] = ~SQL[select db.users.id].tokens
       assert [{:select, _, [{:., _, [{:ident, _, [~c"db"]}, {:ident, _, [~c"users"]}]}]}] = ~SQL[select db.users].tokens
       assert [{:select, _, [{:ident, _, [~c"db"]}]}] = ~SQL[select db].tokens
     end
 
-    test "qouted" do
-      assert [{:select, _, [{:"", _, [{:ident, _, [~c"db.users.id"]}]}]}] = ~SQL[select "db.users.id"].tokens
-      assert [{:select, _, [{:"''", _, [{:ident, _, [~c"db.users"]}]}]}] = ~SQL[select 'db.users'].tokens
-      assert [{:select, _, [{:",", _, [{:"", _, [{:ident, _, [~c"db.users.id"]}]}]}, {:"''", _,  [{:ident, _,  [~c"db.users"]}]}]}] = ~SQL[select "db.users.id", 'db.users'].tokens
+    test "quoted" do
+      assert [{:select, _, [{:double_quote, _, [~c"db.users.id"]}]}] = ~SQL[select "db.users.id"].tokens
+      assert [{:select, _, [{:quote, _, [~c"db.users"]}]}] = ~SQL[select 'db.users'].tokens
+      assert [{:select, _, [{:double_quote, _, [~c"db.users.id"]}, {:comma, _, [{:quote, _,  [~c"db.users"]}]}]}] = ~SQL[select "db.users.id", 'db.users'].tokens
     end
   end
 
   test "interpolation" do
     var = 1
-    assert [{:select, _, [{:binding, _, [1]}]}] = ~SQL[select #{var}].tokens
-    assert [{:select, _, [{:binding, _, [1]}]}] = ~SQL[select #{
+    assert [{:select, _, [{:binding, _, [1]}]}] = ~SQL[select {{var}}].tokens
+    assert [{:select, _, [{:binding, _, [1]}]}] = ~SQL[select {{
       {}
-      }].tokens
+      }}].tokens
   end
 
   describe "operators" do
@@ -342,7 +354,7 @@ defmodule SQLTest do
       assert [{:where, _, [{:ilike, _, [{:ident, _, [~c"id"]}, {:integer, _, [~c"1"]}]}]}] = ~SQL[where id ilike 1].tokens
     end
     test "in" do
-      assert [{:where, _, [{:in, _, [{:ident, _, [~c"id"]}, {:"()", _, [{:",", _, [{:integer, _, [~c"1"]}]}, {:integer, _, [~c"2"]}]}]}]}] = ~SQL[where id in (1, 2)].tokens
+      assert [{:where, _, [{:in, _, [{:ident, _, [~c"id"]}, {:parens, _, [{:integer, _, [~c"1"]}, {:comma, _, [{:integer, _, [~c"2"]}]}]}]}]}] = ~SQL[where id in (1, 2)].tokens
     end
     test "is" do
       assert [{:where, _, [{:is, _, [{:ident, _, [~c"id"]}, {:null, _, []}]}]}] = ~SQL[where id is null].tokens
@@ -356,13 +368,44 @@ defmodule SQLTest do
       assert [{:where, _, [{:is, _, [{:ident, _, [~c"id"]}, {:not, _, [{:unknown, _, []}]}]}]}] = ~SQL[where id is not unknown].tokens
 
       assert [{:where, _, [{:is, _, [{:ident, _, [~c"id"]}, {:distinct, _, [{:from, _, [{:integer, _, [~c"1"]}]}]}]}]}] = ~SQL[where id is distinct from 1].tokens
-      assert [{:where, _, [{:is, _, [{:ident, _, [~c"id"]}, {:not, _, [{:distinct, _, []}]}, {:from, _, [{:integer, _, [~c"1"]}]}]}]}] = ~SQL[where id is not distinct from 1].tokens
+      assert [{:where, _, [{:is, _, [{:ident, _, [~c"id"]}, {:not, _, [{:distinct, _, [{:from, _, [{:integer, _, [~c"1"]}]}]}]}]}]}] = ~SQL[where id is not distinct from 1].tokens
 
       assert [{:where, _, [{:isnull, _, [{:ident, _, [~c"id"]}]}]}] = ~SQL[where id isnull].tokens
       assert [{:where, _, [{:notnull, _, [{:ident, _, [~c"id"]}]}]}] = ~SQL[where id notnull].tokens
     end
     test "as" do
       assert [{:select, _, [{:as, _, [{:ident, _, [~c"id"]}, {:ident, _, [~c"dd"]}]}]}] = ~SQL[select id as dd].tokens
+    end
+  end
+
+  describe "functions" do
+    test "avg" do
+      assert "select avg(id)" == to_string(~SQL[select avg(id)])
+    end
+    test "any" do
+      assert "select any(select *)" == to_string(~SQL[select any(select *)])
+    end
+    test "all" do
+      assert "select all(select *)" == to_string(~SQL[select all(select *)])
+    end
+    test "count" do
+      assert "select count(*)" == to_string(~SQL[select count(*)])
+      assert "select count(id)" == to_string(~SQL[select count(id)])
+    end
+    test "coalesce" do
+      assert "select coalesce(a, b)" == to_string(~SQL[select coalesce(a, b)])
+    end
+    test "exists" do
+      assert "select exists(select *)" == to_string(~SQL[select exists(select *)])
+    end
+    test "min" do
+      assert "select min(a, b)" == to_string(~SQL[select min(a, b)])
+    end
+    test "max" do
+      assert "select max(a, b)" == to_string(~SQL[select max(a, b)])
+    end
+    test "sum" do
+      assert "select sum(id)" == to_string(~SQL[select sum(id)])
     end
   end
 end

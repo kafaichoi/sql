@@ -3,322 +3,239 @@
 
 defmodule SQL.Parser do
   @moduledoc false
+  import Kernel, except: [is_boolean: 1]
 
-  def context(?'), do: :"''"
-  def context(?"), do: :""
-  def context(?[), do: :"[]"
-  def context(?(), do: :"()"
+  defguard is_and(node) when elem(node, 0) == :and
+  defguard is_between(node) when elem(node, 0) == :between
+  defguard is_boolean(node) when elem(node, 0) in ~w[and or <> <= >= != < > !< !> = true false unknown like ilike in all any is isnull notnull between]a
+  defguard is_combinator(node) when elem(node, 0) in ~w[except intersect union]a and elem(node, 2) == []
+  defguard is_comma(node) when elem(node, 0) == :comma
+  defguard is_comment(node) when elem(node, 0) in ~w[comment comments]a
+  defguard is_conditional(node) when elem(node, 0) in ~w[and or]a and elem(node, 2) == []
+  defguard is_colon(node) when elem(node, 0) == :colon
+  defguard is_distinct(node) when elem(node, 0) == :distinct
+  defguard is_declare(node) when elem(node, 0) == :declare
+  defguard is_data_type(node) when elem(node, 0) in ~w[integer float ident quote double_quote backtick bracket parens . binding]a
+  defguard is_fetch(node) when elem(node, 0) == :fetch
+  defguard is_fetch_dir(node) when elem(node, 0) in ~w[absolute backward forward relative]a
+  defguard is_from(node) when elem(node, 0) == :from
+  defguard is_for(node) when elem(node, 0) == :for
+  defguard is_grant(node) when elem(node, 0) == :grant
+  defguard is_revoke(node) when elem(node, 0) == :revoke
+  defguard is_keyword(node) when elem(node, 0) in [:abs, :absent, :acos, :all, :allocate, :alter, :and, :any, :any_value, :are, :array, :array_agg, :array_max_cardinality, :as, :asensitive, :asin, :asymmetric, :at, :atan, :atomic, :authorization, :avg, :begin, :begin_frame, :begin_partition, :between, :bigint, :binary, :blob, :boolean, :both, :btrim, :by, :call, :called, :cardinality, :cascaded, :case, :cast, :ceil, :ceiling, :char, :char_length, :character, :character_length, :check, :classifier, :clob, :close, :coalesce, :collate, :collect, :column, :commit, :condition, :connect, :constraint, :contains, :convert, :copy, :corr, :corresponding, :cos, :cosh, :count, :covar_pop, :covar_samp, :create, :cross, :cube, :cume_dist, :current, :current_catalog, :current_date, :current_default_transform_group, :current_path, :current_role, :current_row, :current_schema, :current_time, :current_timestamp, :current_transform_group_for_type, :current_user, :cursor, :cycle, :date, :day, :deallocate, :dec, :decfloat, :decimal, :declare, :default, :define, :delete, :dense_rank, :deref, :describe, :deterministic, :disconnect, :distinct, :double, :drop, :dynamic, :each, :element, :else, :empty, :end, :end_frame, :end_partition, :"end-exec", :equals, :escape, :every, :except, :exec, :execute, :exists, :exp, :external, :extract, false, :fetch, :filter, :first_value, :float, :floor, :for, :foreign, :frame_row, :free, :from, :full, :function, :fusion, :get, :global, :grant, :greatest, :group, :grouping, :groups, :having, :hold, :hour, :identity, :in, :indicator, :initial, :inner, :inout, :insensitive, :insert, :int, :integer, :intersect, :intersection, :interval, :into, :is, :join, :json, :json_array, :json_arrayagg, :json_exists, :json_object, :json_objectagg, :json_query, :json_scalar, :json_serialize, :json_table, :json_table_primitive, :json_value, :lag, :language, :large, :last_value, :lateral, :lead, :leading, :least, :left, :like, :like_regex, :listagg, :ln, :local, :localtime, :localtimestamp, :log, :log10, :lower, :lpad, :ltrim, :match, :match_number, :match_recognize, :matches, :max, :member, :merge, :method, :min, :minute, :mod, :modifies, :module, :month, :multiset, :national, :natural, :nchar, :nclob, :new, :no, :none, :normalize, :not, :nth_value, :ntile, :null, :nullif, :numeric, :occurrences_regex, :octet_length, :of, :offset, :old, :omit, :on, :one, :only, :open, :or, :order, :out, :outer, :over, :overlaps, :overlay, :parameter, :partition, :pattern, :per, :percent, :percent_rank, :percentile_cont, :percentile_disc, :period, :portion, :position, :position_regex, :power, :precedes, :precision, :prepare, :primary, :procedure, :ptf, :range, :rank, :reads, :real, :recursive, :ref, :references, :referencing, :regr_avgx, :regr_avgy, :regr_count, :regr_intercept, :regr_r2, :regr_slope, :regr_sxx, :regr_sxy, :regr_syy, :release, :result, :return, :returns, :revoke, :right, :rollback, :rollup, :row, :row_number, :rows, :rpad, :rtrim, :running, :savepoint, :scope, :scroll, :search, :second, :seek, :select, :sensitive, :session_user, :set, :show, :similar, :sin, :sinh, :skip, :smallint, :some, :specific, :specifictype, :sql, :sqlexception, :sqlstate, :sqlwarning, :sqrt, :start, :static, :stddev_pop, :stddev_samp, :submultiset, :subset, :substring, :substring_regex, :succeeds, :sum, :symmetric, :system, :system_time, :system_user, :table, :tablesample, :tan, :tanh, :then, :time, :timestamp, :timezone_hour, :timezone_minute, :to, :trailing, :translate, :translate_regex, :translation, :treat, :trigger, :trim, :trim_array, true, :truncate, :uescape, :union, :unique, :unknown, :unnest, :update, :upper, :user, :using, :value, :values, :value_of, :var_pop, :var_samp, :varbinary, :varchar, :varying, :versioning, :when, :whenever, :where, :width_bucket, :window, :with, :within, :without, :year, :a, :absolute, :action, :ada, :add, :admin, :after, :always, :asc, :assertion, :assignment, :attribute, :attributes, :before, :bernoulli, :breadth, :c, :cascade, :catalog, :catalog_name, :chain, :chaining, :character_set_catalog, :character_set_name, :character_set_schema, :characteristics, :characters, :class_origin, :cobol, :collation, :collation_catalog, :collation_name, :collation_schema, :columns, :column_name, :command_function, :command_function_code, :committed, :conditional, :condition_number, :connection, :connection_name, :constraint_catalog, :constraint_name, :constraint_schema, :constraints, :constructor, :continue, :copartition, :cursor_name, :data, :datetime_interval_code, :datetime_interval_precision, :defaults, :deferrable, :deferred, :defined, :definer, :degree, :depth, :derived, :desc, :descriptor, :diagnostics, :dispatch, :domain, :dynamic_function, :dynamic_function_code, :encoding, :enforced, :error, :exclude, :excluding, :expression, :final, :finish, :first, :flag, :following, :format, :fortran, :found, :fulfill, :g, :general, :generated, :go, :goto, :granted, :hierarchy, :ignore, :immediate, :immediately, :implementation, :including, :increment, :initially, :input, :instance, :instantiable, :instead, :invoker, :isolation, :k, :keep, :key, :keys, :key_member, :key_type, :last, :length, :level, :locator, :m, :map, :matched, :maxvalue, :measures, :message_length, :message_octet_length, :message_text, :minvalue, :more, :mumps, :name, :names, :nested, :nesting, :next, :nfc, :nfd, :nfkc, :nfkd, :normalized, :null_ordering, :nullable, :nulls, :number, :object, :occurrence, :octets, :option, :options, :ordering, :ordinality, :others, :output, :overflow, :overriding, :p, :pad, :parameter_mode, :parameter_name, :parameter_ordinal_position, :parameter_specific_catalog, :parameter_specific_name, :parameter_specific_schema, :partial, :pascal, :pass, :passing, :past, :path, :permute, :pipe, :placing, :plan, :pli, :preceding, :preserve, :prev, :prior, :private, :privileges, :prune, :public, :quotes, :read, :relative, :repeatable, :respect, :restart, :restrict, :returned_cardinality, :returned_length, :returned_octet_length, :returned_sqlstate, :returning, :role, :routine, :routine_catalog, :routine_name, :routine_schema, :row_count, :scalar, :scale, :schema, :schema_name, :scope_catalog, :scope_name, :scope_schema, :section, :security, :self, :semantics, :sequence, :serializable, :server_name, :session, :sets, :simple, :size, :sort_direction, :source, :space, :specific_name, :state, :statement, :string, :structure, :style, :subclass_origin, :t, :table_name, :temporary, :through, :ties, :top_level_count, :transaction, :transaction_active, :transactions_committed, :transactions_rolled_back, :transform, :transforms, :trigger_catalog, :trigger_name, :trigger_schema, :type, :unbounded, :uncommitted, :unconditional, :under, :unmatched, :unnamed, :usage, :user_defined_type_catalog, :user_defined_type_code, :user_defined_type_name, :user_defined_type_schema, :utf16, :utf32, :utf8, :view, :work, :wrapper, :write, :zone, :limit, :ilike, :backward, :forward, :isnull, :notnull]
+  defguard is_not(node) when elem(node, 0) == :not and elem(node, 2) == []
+  defguard is_join(node) when elem(node, 0) == :join
+  defguard is_parens(node) when elem(node, 0) == :parens
+  defguard is_operator(node) when elem(node, 0) in ~w[operator :: + - * / ^ % & += -= *= /= %= &= ^-= |*= <=> || as <> <= >= != < > !< !> = like ilike in all any is isnull notnull between]a
+  defguard is_of(node) when elem(node, 0) == :of
+  defguard is_is(node) when elem(node, 0) == :is
+  defguard is_on(node) when elem(node, 0) == :on
+  defguard is_select(node) when elem(node, 0) == :select
 
-  def type(%param{}), do: param
-  def type(param) when is_float(param), do: :float
-  def type(param) when is_integer(param), do: :integer
-  def type(param) when is_map(param), do: :map
-  def type(param) when is_list(param), do: {:list, Enum.uniq(Enum.map(param, &type/1))}
-  def type(param) when is_binary(param), do: :string
-  def type(_param), do: nil
-
-  def type(?., :integer), do: :float
-  def type(b, type) when b in ?0..?9 and type in ~w[nil integer float]a, do: type || :integer
-  def type(_b, _type), do: :ident
-
-  def node(context, metadata, acc, opts), do: {context, List.wrap(if opts[:metadata], do: metadata), List.wrap(acc)}
-
-  ##### This is a mess, we might do better by leveraging the associatity rules instead of pattern matching while merging the nodes
-  defguard is_ident(value) when elem(value, 0) in [:., :ident, :"", :"''", :"[]"]
-  defguard is_bool(value) when elem(value, 0) in ~w[null true false unknown]a
-  defguard is_bool_op(value) when elem(value, 0) in ~w[<> <= >= != < > = like ilike is in]a
-  defguard is_op(value) when elem(value, 0) in ~w[:: || + - ^ * / % as from]a
-  defguard is_lop(value) when elem(value, 0) in ~w[and or]a
-  defguard is_numeric(value) when elem(value, 0) in ~w[float integer]a
-  defguard is_expr(value) when elem(value, 0) in [:"()", :"\#{}", :binding]
-  defguard is_datatype(value) when is_ident(value) or is_numeric(value) or is_bool(value) or is_expr(value)
-  defguard is_operator(value) when is_bool_op(value) or is_op(value)
-
-  def merge([{:is, _, _}, {tag, _, _}] = rest) when tag in ~w[not distinct]a, do: rest
-  def merge([{:is = tag, meta, acc}, {:distinct = t, m, []}, {:from = t2, m2, []}, right | rest]), do: merge([{tag, meta, acc ++ [{t, m, [{t2, m2, [right]}]}]} | rest])
-  def merge([{:is = tag, meta, acc}, {:from = t, m, []}, right | rest]), do: merge([{tag, meta, acc ++ [{t, m, [right]}]} | rest])
-  def merge([right, {:is = tag, meta, []} | rest]) when is_ident(right) or is_numeric(right) or is_expr(right), do: merge([{tag, meta, [right]} | rest])
-  def merge([{:is = tag, meta, acc}, {:not = t, m, []}, right | rest]), do: merge([{tag, meta, acc ++ [{t, m, [right]}]} | rest])
-  def merge([{:is = tag, meta, acc}, right | rest]), do: merge([{tag, meta, acc ++ [right]} | rest])
-  def merge([{_, _, _} = right, {tag, meta, [] = acc} | rest]) when tag in ~w[not]a, do: merge([{tag, meta, acc ++ [right]} | rest])
-  def merge([{_, _, _} = right, {tag, meta, [] = acc} | rest]) when tag in ~w[asc desc isnull notnull]a, do: merge([{tag, meta, acc ++ [right]} | rest])
-  def merge([{tag, meta, []}, {:integer, _, _} = left | rest]) when tag in ~w[absolute relative]a, do: merge([{tag, meta, [left]} | rest])
-  def merge([{tag, meta, []}, {t, _, _} = left | rest]) when tag in ~w[forward backward]a and t in ~w[integer all]a, do: merge([{tag, meta, [left]} | rest])
-  def merge([{tag, _, _} = right, {t, m, []} | left]) when tag in ~w[next prior first last absolute relative all forward backward]a and t in ~w[in from]a, do: merge([{t, m, [right | left]}])
-  def merge([{:distinct = tag, meta, []}, {:on = t, m, []}, {:"()", _, _} = right | rest]), do: merge([{tag, meta, [{:on = t, m, [right]}]} | rest])
-  def merge([left, {:on = tag, meta, []}, {:"()", _, _} = right | rest]), do: merge([{tag, meta, [left, right]} | rest])
-
-  def merge([left, {:all = tag, meta, []}, {:"()", _, _} = right | rest]), do: merge([left, {tag, meta, [right]} | rest])
-
-  def merge([left, {:on = tag, meta, []} | right]), do: merge([{tag, meta, [left] ++ right}])
-  def merge([l1, l2, {:on = tag, meta, []} | right]), do: merge([{tag, meta, [[l1, l2]] ++ right}])
-  def merge([left, {:all = tag, meta, [] = acc} | right]), do: merge([left, {tag, meta, acc ++ right}])
-  def merge([{:by = tag, meta, acc}, {_, _, _} = right | rest]), do: merge([{tag, meta, acc ++ [right]} | rest])
-  def merge([op, right, {:. = tag, meta, []}, left | rest]) when (is_bool_op(op) or is_lop(op) or is_op(op)) and is_ident(right) and is_ident(left), do: merge([op, {tag, meta, [right, left]} | rest])
-  def merge([lop, op, right, {:. = tag, meta, []}, left | rest]) when is_lop(lop) and is_bool_op(op) and is_ident(right) and is_ident(left), do: merge([lop, op, {tag, meta, [right, left]} | rest])
-  def merge([right, {:. = tag, meta, []}, left | rest]) when is_ident(right) and is_ident(left), do: merge([{tag, meta, [right, left]} | rest])
-  def merge([op, l, {:between = tag, meta, []}, right, {:and = t, m, []}, left | rest]) when is_lop(op) and is_datatype(l) and is_datatype(right) and is_datatype(left), do: merge([op, {tag, meta, [l, {t, m, [right, left]}]} | rest])
-
-  def merge([op, l, {:between = tag, meta, []}, {:symmetric = t, m, []}, right, {:and = t2, m2, []}, left | rest]) when is_lop(op) and is_datatype(l) and is_datatype(right) and is_datatype(left), do: merge([op, {tag, meta, [l, {t, m, [{t2, m2, [right, left]}]}]} | rest])
-
-  def merge([l, {:between = tag, meta, []}, {:symmetric = t, m, []}, right, {:and = t2, m2, []}, left | rest]) when (is_datatype(l) or elem(l, 0) == :not) and is_datatype(right) and is_datatype(left), do: merge([{tag, meta, [l, {t, m, [{t2, m2, [right, left]}]}]} | rest])
-  def merge([l, {:between = tag, meta, []}, right, {:and = t, m, []}, left | rest]) when (is_datatype(l) or elem(l, 0) == :not) and is_datatype(right) and is_datatype(left), do: merge([{tag, meta, [l, {t, m, [right, left]}]} | rest])
-  def merge([{t, m, [r]} = op, {:between, _, _} = left | rest]) when is_lop(op), do: merge([{t, m, [r, left]} | rest])
-  def merge([right, {t, m, []} = op, left | rest]) when is_lop(right) and is_lop(op) and is_bool(left), do: merge([{t, m, [right, left]} | rest])
-  def merge([right, {tag, meta, []} = left | rest]) when is_datatype(right) and is_op(left), do: merge([{tag, meta, [right]} | rest])
-  def merge([right, {tag, meta, []} = left | rest]) when is_datatype(right) and is_bool_op(left), do: merge([{tag, meta, [right]} | rest])
-  def merge([op, right, {tag, meta, []} = left | rest]) when (is_bool_op(op) or is_lop(op) or is_op(op)) and is_datatype(right) and is_operator(left), do: merge([op, {tag, meta, [right]} | rest])
-  def merge([{t, m, [r]} = lop, {t2, m2, [r2]} = op, left, {t3, m3, []} = lop2 | rest]) when is_lop(lop) and is_lop(lop2) and is_bool_op(op) and is_datatype(left), do: merge([{t3, m3, [{t, m, [r, {t2, m2, [r2, left]}]}]} | rest])
-
-  def merge([op, right, {tag, meta, []} = left | rest]) when is_lop(op) and is_datatype(right) and is_bool_op(left), do: merge([op, {tag, meta, [right]} | rest])
-  def merge([{tag, meta, [right]} = op, left, lop | rest]) when is_bool_op(op) and is_datatype(left) and is_lop(lop), do: merge([{tag, meta, [right, left]}, lop | rest])
-
-  def merge([{tag, meta, [right]} = op, left | rest]) when (is_bool_op(op) or is_op(op)) and is_datatype(left), do: merge([{tag, meta, [right, left]} | rest])
-  def merge([{_, _, [_, _]} = right, {tag, meta, []} = left | rest]) when is_bool_op(right) and is_lop(left), do: merge([{tag, meta, [right]} | rest])
-
-  def merge([{tag, meta, [right]} = lop, {_, _, [_, _]} = left | rest]) when is_bool_op(left) and is_lop(lop), do: merge([{tag, meta, [right, left]} | rest])
-
-  def merge([{tag, meta, [right]} = lop, {_, _, []} = left | rest]) when is_bool(left) and is_lop(lop), do: merge([{tag, meta, [right, left]} | rest])
-  def merge([{:recursive = t, m, []}, {:as = t2, m2, [l, r]}]), do: merge([{t2, m2, [{t, m, l}, r]}])
-  def merge([{:ident, _, _} = l1, {:"()", _, _} = l2, {:as = t2, m2, []}, {:"()", _, _} = r]), do: merge([{t2, m2, [[l1, l2], r]}])
-  def merge(unit), do: unit
-  #####
-
-  def merge(unit, nil, _data, _line, _column, _opts), do: merge(unit)
-  def merge(unit, type, data, line, column, opts) when is_integer(line) and type != nil, do: merge(unit ++ [node(type, [line: line, column: column - length(data), end_line: line, end_column: column], [data], opts)])
-
-  def merge(root, [], _metadata, acc, unit, _opts), do: root ++ merge(acc ++ unit)
-  def merge([] = root, :"()", _metadata, [], [], _opts), do: root
-  def merge(root, context, metadata, acc, unit, opts) do
-    root ++ [node(context, metadata, merge(acc ++ unit), opts)]
+  def predicate([l, c, r]) when is_boolean(l) and is_conditional(c) and is_boolean(r) do
+    {elem(c, 0), elem(c, 1), [l, r]}
+  end
+  def predicate([l, b]) when is_boolean(b) do
+    [{elem(b, 0), elem(b, 1), [l | elem(b, 2)]}]
+  end
+  def predicate([l, b, r | rest]) when is_boolean(b) or is_operator(b) do
+    predicate([{elem(b, 0), elem(b, 1), [l, r]} | rest])
+  end
+  def predicate([{_, _, _}, node | _] =  unit) when is_comma(node) do
+    unit
+  end
+  def predicate([l, b, r, c | rest]) when is_comma(c) and (is_boolean(b) or is_operator(b)) do
+    [{elem(b, 0), elem(b, 1), [l, r]}, c | rest]
+  end
+  def predicate([l, c, r, c2 | rest]) when is_boolean(l) and is_conditional(c) and is_boolean(r) and is_conditional(c2) do
+    predicate([{elem(c, 0), elem(c, 1), [l, r]}, c2 | rest])
+  end
+  def predicate([f, c, l, b, r, c2 | rest]) when is_boolean(b) and is_conditional(c) and is_conditional(c2) do
+    predicate([f, c, {elem(b, 0), elem(b, 1), [l, r]}, c2 | rest])
+  end
+  def predicate([f, c, l, b, r]) when is_boolean(b) and is_conditional(c) do
+    predicate([f, c, {elem(b, 0), elem(b, 1), [l, r]}])
+  end
+  def predicate([l, b, r, c | rest]) when is_boolean(b) and is_conditional(c) do
+    predicate([{elem(b, 0), elem(b, 1), [l, r]}, c | rest])
+  end
+  def predicate(unit) do
+    unit
   end
 
-  def expected_delimiter(:"()"), do: :")"
-  def expected_delimiter(:"''"), do: :"'"
-  def expected_delimiter(:""), do: :"\""
 
-  def opening_delimiter(:"()"), do: :"("
-  def opening_delimiter(:"''"), do: :"'"
-  def opening_delimiter(:""), do: :"\""
-
-  def error!(attrs), do: raise(TokenMissingError, attrs)
-
-  def parse(binary, binding, _meta, params \\ [], opts \\ [metadata: true]) do
-    case parse(binary, binary, opts ++ [binding: binding, params: params], 0, 0, nil, [], [], [], [], [], []) do
-      {"", _binary, opts, line, column, type, data, unit, context, metadata, acc, root} ->
-          {:ok, merge(root, context, metadata ++ [end_line: line, end_column: column], acc, merge(unit, type, data, line, column, opts), opts), opts[:params]}
-    end
+  def insert_node(node, unit, acc, context, root) when is_parens(node) do
+    {[{elem(node, 0), elem(node, 1), parse(elem(node, 2))} | unit], acc, context, root}
   end
-  def parse(<<b, rest::binary>>, binary, opts, line, column, type, data, unit, :"" = context, metadata, acc, root) when b != ?" do
-    parse(rest, binary, opts, line, column+1, type(b, type), data ++ [b], unit, context, metadata, acc, root)
+  def insert_node(node, [{:in = tag, meta, []}, right, {:using, _, _} = using | unit], acc, context, root) do
+    {[{tag, meta, [node, [right, using | unit]]}], acc, context, root}
   end
-  def parse(<<b, rest::binary>>, binary, opts, line, column, type, data, unit, :"''" = context, metadata, acc, root) when b != ?' do
-    parse(rest, binary, opts, line, column+1, type(b, type), data ++ [b], unit, context, metadata, acc, root)
+  def insert_node({:in, _, _} = node, [_, {:using, _, _}|_] = unit, acc, context, root) do
+    {[node | unit], acc, context, root}
   end
-  def parse("" = rest, binary, opts, line, column, type, data, unit, context, metadata, acc, root) do
-    {rest, binary, opts, line, column, type, data, unit, context, metadata, acc, root}
+  def insert_node({:into = tag, meta, _}, [_] = unit, acc, context, root) do
+    {[{tag, meta, unit}], acc, context, root}
   end
-  def parse(<<b, rest::binary>>, binary, opts, line, column, nil = type, [] = data, [] = unit, context, metadata, acc, root) when b == ?+ or b == ?- do
-    parse(rest, binary, opts, line, column+1, type, data ++ [b], unit, context, metadata, acc, root)
+  def insert_node(node, [n, b, r, c, l | unit], acc, context, root) when is_between(b) and is_and(c) and is_not(n) and is_data_type(r) and is_data_type(l) and is_data_type(node) do
+    {[{elem(b, 0), elem(b, 1), [{elem(n, 0), elem(n, 1), [node]}, {elem(c, 0), elem(c, 1), [r, l]}]} | unit], acc, context, root}
   end
-  def parse(<<b, rest::binary>>, binary, opts, line, column, type, data, unit, context, metadata, acc, root) when type in ~w[float integer]a and (b == ?. or b >= ?0 and b <= ?9) do
-    parse(rest, binary, opts, line, column+1, type(b, type), data ++ [b], unit, context, metadata, acc, root)
+  def insert_node(node, [n, b, s, r, c, l | unit], acc, context, root) when is_between(b) and is_and(c) and is_not(n) and is_data_type(r) and is_data_type(l) and is_data_type(node) do
+    {[{elem(b, 0), elem(b, 1), [{elem(n, 0), elem(n, 1), [node]}, {elem(s, 0), elem(s, 1), [{elem(c, 0), elem(c, 1), [r, l]}]}]} | unit], acc, context, root}
   end
-  for keyword <- ~w[with select where group having order offset limit fetch] do
-    {match, guard, rest, len, tag} = SQL.Compiler.generate(keyword)
-    def parse(unquote(match), binary, opts, line, end_column, nil = type, [] = data, unit, context, metadata, acc, root) when unquote(guard) do
-      column = end_column+unquote(len)
-      parse(unquote(rest), binary, opts, line, column, type, data, [], unquote(tag), [line: line, column: column], [], merge(root, context, metadata ++ [end_line: line, end_column: end_column], acc, unit, opts))
-    end
+  def insert_node(node, [b, s, r, c, l | unit], acc, context, root) when is_between(b) and is_and(c) and is_data_type(r) and is_data_type(l) and is_data_type(node) do
+    {[{elem(b, 0), elem(b, 1), [node, {elem(s, 0), elem(s, 1), [{elem(c, 0), elem(c, 1), [r, l]}]}]} | unit], acc, context, root}
   end
-  for keyword <- ~w[inner natural left right full cross] do
-    {match, guard, rest, len, tag} = SQL.Compiler.generate(keyword)
-    def parse(unquote(match), binary, opts, line, column, nil = type, [] = data, unit, context, metadata, acc, root) when unquote(guard) do
-      end_column = column+unquote(len)
-      parse(unquote(rest), binary, opts, line, end_column, type, data, [], :join, [line: line, column: end_column], [node(unquote(tag), [line: line, column: column, end_line: line, end_column: end_column], [], opts)], merge(root, context, metadata ++ [end_line: line, end_column: column], acc, unit, opts))
-    end
+  def insert_node(node, [b, r, c, l | unit], acc, context, root) when is_between(b) and is_and(c) and is_data_type(r) and is_data_type(l) and is_data_type(node) do
+    {[{elem(b, 0), elem(b, 1), [node, {elem(c, 0), elem(c, 1), [r, l]}]} | unit], acc, context, root}
   end
-  for keyword <- ~w[outer on by recursive] do
-    {match, guard, rest, len, tag} = SQL.Compiler.generate(keyword)
-    def parse(unquote(match), binary, opts, line, end_column, nil = type, [] = data, unit, context, metadata, acc, root) when unquote(guard) do
-      parse(unquote(rest), binary, opts, line, end_column+unquote(len), type, data, [], context, [line: line, column: end_column], acc ++ unit ++ [node(unquote(tag), metadata ++ [end_line: line, end_column: end_column], [], opts)], root)
-    end
+  def insert_node(node, [b, l, c | unit], acc, context, root) when is_data_type(node) and is_operator(b) and is_data_type(l) and is_conditional(c) do
+    {[{elem(b, 0), elem(b, 1), [node, l]}, c | unit], acc, context, root}
   end
-  for keyword <- ~w[except intersect union] do
-    {match, guard, rest, len, tag} = SQL.Compiler.generate(keyword)
-    def parse(unquote(match), binary, opts, line, column, type, data, unit, context, metadata, acc, root) when unquote(guard) do
-      left = case merge(root, context, metadata ++ [end_line: line, end_column: column], acc, merge(unit, type, data, line, column, opts), opts) do
-        [{tag, _, _}] = left when tag in ~w[all ()]a -> left
-        left -> [left]
-      end
-      column = column+unquote(len)
-      case parse(unquote(rest), binary, opts, line, column, nil, [], [], unquote(tag), [line: line, column: column], [], []) do
-        {rest, binary, opts, line, column, type, data, unit, context, metadata, acc, [{unquote(tag), meta, []} | right]} ->
-          {rest, binary, opts, line, column, nil, [], [], [], metadata, [], [{unquote(tag), meta, left ++ [merge(right, context, metadata ++ [end_line: line, end_column: column], acc, merge(unit, type, data, line, column, opts), opts)]}]}
-        {rest, binary, opts, line, column, type, data, unit, context, metadata, acc, root} ->
-          {rest, binary, opts, line, column, nil, [], [], [], metadata, acc, merge(root, context, metadata ++ [end_line: line, end_column: column], left ++ acc, merge(unit, type, data, line, column, opts), opts)}
-      end
-    end
+  def insert_node(node, [r, b, l | unit], acc, context, root) when is_conditional(node) and is_data_type(r) and is_operator(b) and is_data_type(l) do
+    {[node, {elem(b, 0), elem(b, 1), [r, l]} | unit], acc, context, root}
   end
-  for keyword <- ~w[all] do
-    {match, guard, rest, len, tag} = SQL.Compiler.generate(keyword)
-    def parse(unquote(match), binary, opts, line, column, nil = type, [] = data, unit, :fetch = context, metadata, acc, root) when unquote(guard) do
-      end_column = column+unquote(len)
-      parse(unquote(rest), binary, opts, line, end_column, type, data, unit ++ [node(unquote(tag), [line: line, column: column, end_line: line, end_column: end_column], [], opts)], context, metadata, acc, root)
-    end
-    def parse(unquote(match), binary, opts, line, column, nil = type, [] = data, unit, context, metadata, acc, root) when unquote(guard) do
-      case parse(unquote(rest), binary, opts, line, column+unquote(len), type, data, [], unquote(tag), [line: line, column: column], [], []) do
-         {rest, end_line, end_column, result} ->
-           parse(rest, binary, opts, end_line, end_column, type, data, unit ++ result, context, metadata, acc, root)
-         {rest, binary, opts, end_line, end_column, t, d, u, c, m, a, r} ->
-           {rest, binary, opts, end_line, end_column, type, data, unit ++ merge(r, c, m ++ [end_line: end_line, end_column: end_column], a, merge(u, t, d, end_line, end_column, opts), opts), context, metadata, acc, root}
-      end
-    end
+  def insert_node(node, [o, l], acc, context, root) when is_data_type(node) and is_operator(o) and is_data_type(l) do
+    {[{elem(o, 0), elem(o, 1), [node, l]}], acc, context, root}
   end
-  for keyword <- ~w[is isnull not notnull as at in collate next prior first last absolute relative forward backward distinct any exists some between symmetric ilike like similar operator count] do
-    {match, guard, rest, len, tag} = SQL.Compiler.generate(keyword)
-    def parse(unquote(match), binary, opts, line, column, nil = type, [] = data, unit, context, metadata, acc, root) when unquote(guard) do
-      end_column = column+unquote(len)
-      parse(unquote(rest), binary, opts, line, end_column, type, data, unit ++ [node(unquote(tag), [line: line, column: column, end_line: line, end_column: end_column], [], opts)], context, metadata, acc, root)
-    end
+  def insert_node(node, [u | unit], acc, context, root) when is_not(node) and elem(u, 0) in ~w[false true unknown null]a do
+    {[{elem(node, 0), elem(node, 1), [u]} | unit], acc, context, root}
   end
-  for keyword <- ~w[unknown true false null isnull notnull asc desc] do
-    {match, guard, rest, len, tag} = SQL.Compiler.generate(keyword, next: [?\s, ?\t, ?\r, ?\n, ?\f, 194, 160, ?,])
-    def parse(unquote(match), binary, opts, line, column, nil = type, [] = data, unit, context, metadata, acc, root) when unquote(guard) do
-      end_column = column+unquote(len)
-      parse(unquote(rest), binary, opts, line, end_column, type, data, unit ++ [node(unquote(tag), [line: line, column: column, end_line: line, end_column: end_column], [], opts)], context, metadata, acc, root)
-    end
-    {match, guard, rest, len, tag} = SQL.Compiler.generate(keyword, eos: true)
-    def parse(unquote(match), binary, opts, line, column, nil = type, [] = data, unit, context, metadata, acc, root) when unquote(guard) do
-      end_column = column+unquote(len)
-      parse(unquote(rest), binary, opts, line, end_column, type, data, unit ++ [node(unquote(tag), [line: line, column: column, end_line: line, end_column: end_column], [], opts)], context, metadata, acc, root)
-    end
+  def insert_node(node, [u | unit], acc, context, root) when is_not(u) and is_data_type(node) do
+    {[{elem(u, 0), elem(u, 1), [node | unit]}], acc, context, root}
   end
-  for keyword <- ~w[and or] do
-    {match, guard, rest, len, tag} = SQL.Compiler.generate(keyword)
-    def parse(unquote(match), binary, opts, line, column, nil = type, [] = data, unit, context, metadata, acc, root) when unquote(guard) do
-      end_column = column+unquote(len)
-      parse(unquote(rest), binary, opts, line, end_column, type, data, merge(unit, type, data, line, column, opts) ++ [node(unquote(tag), [line: line, column: column, end_line: line, end_column: end_column], [], opts)], context, metadata, acc, root)
-    end
+  def insert_node({:into = tag, meta, []}, [ident, parens, values], acc, context, root) do
+    {[], [{tag, meta, [ident, parens, values]} | acc], context, root}
   end
-  for keyword <- ~w{:: [] <> <= >= != !< !> += -= *= /= %= &= ^-= |*= <=> || . + - ^ * / % & < > =} do
-    {match, guard, rest, len, tag} = SQL.Compiler.generate(keyword, next: false)
-    def parse(unquote(match), binary, opts, line, column, type, data, unit, context, metadata, acc, root) when unquote(guard) do
-      end_column = column+unquote(len)
-      meta = [line: line, column: column, end_line: line, end_column: end_column]
-      unit = merge(unit, type, data, line, column, opts)
-      parse(unquote(rest), binary, opts, line, end_column, nil, [], unit ++ [node(unquote(tag), meta, [], opts)], context, metadata, acc, root)
-    end
+  def insert_node({tag, meta, []}, [ident, parens], acc, context, root) when tag in ~w[into table]a do
+    {[], [{tag, meta, [ident, parens]} | acc], context, root}
   end
-  for keyword <- ~w[from join] do
-    {match, guard, rest, len, tag} = SQL.Compiler.generate(keyword)
-    def parse(unquote(match), binary, opts, line, column, nil = type, [] = data, unit, context, metadata, acc, root) when unquote(guard) do
-      end_column = column+unquote(len)
-      metadata = metadata ++ [end_line: line, end_column: end_column]
-      tag = Enum.at(unit, 0)
-      cond do
-        context == :join ->
-          acc = if acc == [], do: acc, else: [acc]
-          parse(unquote({:rest, [], Elixir}), binary, opts, line, end_column, type, data, unit, context, metadata, acc, root)
-        is_tuple(tag) and elem(tag, 0) == :is and context in ~w[where having]a ->
-          parse(unquote({:rest, [], Elixir}), binary, opts, line, end_column, type, data, unit ++ [node(unquote(tag), [], [], opts)], context, metadata, acc, root)
-        true ->
-          parse(unquote(rest), binary, opts, line, end_column, type, data, [], unquote(tag), [line: line, column: column], [], merge(root, context, metadata, acc, unit, opts))
-      end
-    end
+  def insert_node({:add = tag, meta, []}, [ident, type], acc, context, root) do
+    {[], [{tag, meta, [ident, type]} | acc], context, root}
   end
-  def parse(<<?#, ?{, rest::binary>>, binary, opts, line, column, _type, data, unit, context, metadata, acc, root) do
-    column = column+2
-    binding = opts[:binding]
-    case interpolation(rest, binding, line, column) do
-      {:error, "", end_line, end_column, _acc} ->
-        error!([line: line, column: column, end_line: end_line, end_column: end_column, file: "", snippet: binary, opening_delimiter: :"\#{", expected_delimiter: :"}"])
-      {rest, end_line, end_column, result} when binding == false ->
-        parse(rest, binary, opts, end_line, end_column, nil, data, unit ++ [{:"\#{}", [line: line, column: column, end_line: end_line, end_column: end_column], [result]}], context, metadata, acc, root)
-      {rest, end_line, end_column, result} when is_atom(result) ->
-        if param = binding[result] do
-          parse(rest, binary, update_in(opts, [:params], &(&1++[param])), end_line, end_column, nil, data, unit ++ [{:binding, [type: type(param), line: line, column: column, end_line: end_line, end_column: end_column], [length(opts[:params])+1]}], context, metadata, acc, root)
-        else
-          raise ArgumentError, "The variable #{result} is not defined"
-        end
-      {rest, end_line, end_column, {param, _}} ->
-        parse(rest, binary, update_in(opts, [:params], &(&1++[param])), end_line, end_column, nil, data, unit ++ [{:binding, [type: type(param), line: line, column: column, end_line: end_line, end_column: end_column], [length(opts[:params])+1]}], context, metadata, acc, root)
-    end
+  def insert_node({:type = tag, meta, []}, [ident, as, type], acc, context, root) do
+    {[], [{tag, meta, [{elem(as, 0), elem(as, 1), [ident, type]}]} | acc], context, root}
   end
-  def parse(<<?), rest::binary>>, _binary, opts, line, column, type, data, unit, :"()" = context, metadata, acc, root) do
-    column = column+1
-    {rest, line, column, merge(root, context, metadata ++ [end_line: line, end_column: column], acc, merge(unit, type, data, line, column, opts), opts)}
+  def insert_node({tag, meta, []}, [ident], acc, context, root) when tag in ~w[type table]a do
+    {[], [{tag, meta, [ident]} | acc], context, root}
   end
-  def parse(<<?], rest::binary>>, _binary, opts, line, column, type, data, unit, :"[]" = context, metadata, acc, root) do
-    {rest, line, column, merge(root, context, metadata ++ [end_line: line, end_column: column], acc, merge(unit, type, data, line, column, opts), opts)}
+  def insert_node({:with = tag, meta, []}, [{:recursive = t,  m, []}, {:ident, _, _} = l, {:parens, _, _} = r, {:as = t2, m2, a}], [], context, root) do
+    {[], [], context, root ++ [{tag, meta, [{t2, m2, [{t, m, [l, r]} | a]}]}]}
   end
-  def parse(<<?", rest::binary>>, _binary, opts, line, column, type, data, unit, :"" = context, metadata, acc, root) do
-    {rest, line, column, merge(root, context, metadata ++ [end_line: line, end_column: column], acc, merge(unit, type, data, line, column, opts), opts)}
+  def insert_node({:with = tag, meta, []}, [{:ident, _, _} = l, {:parens, _, _} = r, {:as = t2, m2, a}], [], context, root) do
+    {[], [], context, root ++ [{tag, meta, [{t2, m2, [[l, r] | a]}]}]}
   end
-  def parse(<<?', rest::binary>>, _binary, opts, line, column, type, data, unit, :"''" = context, metadata, acc, root) do
-    {rest, line, column, merge(root, context, metadata ++ [end_line: line, end_column: column], acc, merge(unit, type, data, line, column, opts), opts)}
+  def insert_node({tag, meta, []}, unit, acc, context, root) when tag in ~w[by in references]a do
+    {[{tag, meta, predicate(unit ++ acc)}], [], context, root}
   end
-  def parse(<<b, rest::binary>>, binary, opts, line, column, type, data, unit, context, metadata, acc, root) when b in [?(, ?[, ?", ?'] do
-    unit = merge(unit, type, data, line, column, opts)
-    column = column+1
-    tag = context(b)
-    case parse(rest, binary, opts, line, column, nil, [], [], tag, [line: line, column: column], [], [])  do
-      {rest, end_line, end_column, [{^tag, _, _}] = result} ->
-        parse(rest, binary, opts, end_line, end_column, nil, data, unit ++ result, context, metadata, acc, root)
-      {rest, end_line, end_column, result} ->
-        parse(rest, binary, opts, end_line, end_column, nil, data, unit ++ [node(tag, [line: line, column: column, end_line: end_line, end_column: end_column], result, opts)], context, metadata, acc, root)
-      {"" = rest, binary, opts, end_line, end_column, nil, [], [], [], _meta, [], nodes} when nodes != [] ->
-        {rest, binary, opts, end_line, end_column, type, data, unit ++ [node(tag, [line: line, column: column, end_line: end_line, end_column: end_column], nodes, opts)], context, metadata, acc, root}
-      {"", binary, _, end_line, end_column, _, _, _, _, _, _, _} ->
-        error!([line: line, column: column, end_line: end_line, end_column: end_column, file: "", snippet: binary, opening_delimiter: opening_delimiter(tag), expected_delimiter: expected_delimiter(tag)])
-    end
+  def insert_node(node, [n|_] = unit, acc, context, root) when (is_on(n) or is_of(n)) and elem(node, 0) in ~w[select insert update delete truncate references trigger create connect temporary execute usage set alter system maintain]a do
+    {[node|unit], acc, context, root}
   end
-  def parse(<<b, rest::binary>>, _binary, opts, line, column, type, data, unit, context, metadata, acc, root) when b in [?), ?], ?", ?'] do
-    column = column+1
-    {rest, line, column, merge(root, context, metadata ++ [end_line: line, end_column: column], acc, merge(unit, type, data, line, column, opts), opts)}
+  def insert_node(node, [_, n|_] = unit, acc, context, root) when is_for(n) and is_from(node) do
+    {[node|unit], acc, context, root}
   end
-  def parse(<<?,, rest::binary>>, binary, opts, line, column, type, data, unit, context, metadata, acc, root) do
-    parse(rest, binary, opts, line, column+1, nil, [], [], context, metadata, acc ++ [{:",", [line: line, column: column, end_line: line, end_column: column+1], merge(merge(unit, type, data, line, column, opts))}], root)
+  def insert_node(node, [_, _, _, n|_] = unit, acc, context, root) when is_for(n) and is_select(node) do
+    {[node|unit], acc, context, root}
   end
-  def parse(<<?;, rest::binary>>, binary, opts, line, column, type, data, unit, context, metadata, acc, root) do
-    end_column = column+1
-    node = node(:";", [line: line, column: column, end_line: line, end_column: end_column], merge(root, context, metadata ++ [end_line: line, end_column: column], acc, merge(unit, type, data, line, column, opts), opts), opts)
-    parse(rest, binary, opts, line, end_column, nil, [], [], [], [], [], [] ++ [node])
+  def insert_node(node, [] = unit, [] = acc, [] = context, root) when elem(node, 0) in ~w[create drop insert alter update delete start set open close commit rollback]a do
+    {[node | unit], acc, context, root}
   end
-  def parse(<<?\n, rest::binary>>, binary, opts, line, column, type, data, unit, context, metadata, acc, root) do
-    parse(rest, binary, opts, line+1, column, nil, [], merge(unit, type, data, line, column, opts), context, metadata, acc, root)
+  def insert_node({tag, meta, []}, unit, acc, context, root) when tag in ~w[create drop insert alter update delete start set open close commit rollback]a do
+    {[], [], context, [{tag, meta, List.wrap(predicate(unit ++ acc))} | root]}
   end
-  def parse(<<b, rest::binary>>, binary, opts, line, column, type, data, unit, context, metadata, acc, root) when b in [?\s, ?\t, ?\r, ?\f, 194, 160] do
-    parse(rest, binary, opts, line, column+1, nil, [], merge(unit, type, data, line, column, opts), context, metadata, acc, root)
+  def insert_node(node, [n |_] = unit, acc, context, root) when is_grant(node) and elem(n, 0) == :option do
+    {[node | unit], acc, context, root}
   end
-  def parse(<<b, rest::binary>>, binary, opts, line, column, type, data, unit, context, metadata, acc, root) do
-    parse(rest, binary, opts, line, column+1, type(b, type), data ++ [b], unit, context, metadata, acc, root)
+  def insert_node(node, unit, acc, context, root) when is_grant(node) or is_revoke(node) or is_declare(node) do
+    {[], [], context, [{elem(node, 0), elem(node, 1), unit ++ acc ++ root}]}
+  end
+  def insert_node({:distinct = tag, meta, []}, [{:on, _, _} = on | unit], acc, context, root) do
+    {[{tag, meta, [on]} | unit], acc, context, root}
+  end
+  def insert_node(node, [u | unit], acc, context, root) when is_fetch_dir(node) and elem(u, 0) != :in do
+    {[{elem(node, 0), elem(node, 1), [u]}], unit++acc, context, root}
+  end
+  def insert_node(node, [u | unit], acc, context, root) when is_fetch(node) do
+    {[], [], context, [{elem(node, 0), elem(node, 1), [u]} | unit ++ acc ++ root]}
+  end
+  def insert_node(node, [on], [], context, root) when is_join(node) and is_on(on) do
+    {[], [], context, [{elem(node, 0), elem(node, 1), elem(node, 2) ++ [on]} | root]}
+  end
+  def insert_node(node, [ident, on], [] = acc, context, root) when is_join(node) and is_on(on) do
+    {[], acc, context, [{elem(node, 0), elem(node, 1), elem(node, 2) ++ [{elem(on, 0), elem(on, 1), [ident | elem(on, 2)]}]} | root]}
+  end
+  def insert_node(node, [ident, as, on | unit], [] = acc, context, root) when is_join(node) and is_on(on) do
+    {[], acc, context, [{elem(node, 0), elem(node, 1), elem(node, 2) ++ [{elem(on, 0), elem(on, 1), [[ident, as]] ++ elem(on, 2) ++ unit}]} | root]}
+  end
+  def insert_node(node, [ident, on | unit], [] = acc, context, root) when is_join(node) and is_on(on) do
+    {[], acc, context, [{elem(node, 0), elem(node, 1), elem(node, 2) ++ [{elem(on, 0), elem(on, 1), [ident] ++ elem(on, 2) ++ unit}]} | root]}
+  end
+  def insert_node(node, unit, acc, context, root) when is_join(node) do
+    a = elem(node, 2)
+    acc = unit ++ acc
+    acc = if a == [], do: acc, else: a ++ [acc]
+    {[], [], context, [{elem(node, 0), elem(node, 1), acc} | root]}
+  end
+  def insert_node({tag, meta, []}, unit, acc, context, root) when tag in ~w[select from where group having order limit offset]a do
+    {[], [], context, [{tag, meta, List.wrap(predicate(unit ++ acc))} | root]}
+  end
+  def insert_node(node, unit, acc, context, {:colon, meta, []}) do
+    {unit, acc, context, {:colon, meta, [node]}}
+  end
+  def insert_node(node, [parens | unit], acc, context, root) when is_parens(parens) and is_keyword(node) do
+    {[{elem(node, 0), elem(node, 1), [parens]} | unit], acc, context, root}
+  end
+  def insert_node(node, unit, acc, context, root)  do
+    {[node | unit], acc, context, root}
   end
 
-  def interpolation(binary, binding, line, column, type \\ :var, acc \\ [], n \\ 0)
-  def interpolation("" = rest, _binding, line, column, _type,  acc, 0), do: {:error, rest, line, column, acc}
-  def interpolation(<<?}, rest::binary>>, _binding, line, column, :var, acc, 0) do
-    {<<rest::binary>>, line, column+1, List.to_atom(acc)}
+  def parse(tokens) do
+    parse(tokens, [], [], [], [])
   end
-  def interpolation(<<?}, rest::binary>>, binding, line, column, :code, acc, 0) do
-    {<<rest::binary>>, line, column+1, Code.eval_string("#{acc}", binding)}
+  def parse([], [], [], [], root) do
+    root
   end
-  def interpolation(<<?{, rest::binary>>, binding, line, column, _type, acc, n) do
-    interpolation(rest, binding, line, column, :code, acc ++ [?{], n+1)
+  def parse([], unit, acc, [], []) do
+    predicate(unit ++ acc)
   end
-  def interpolation(<<?}, rest::binary>>, binding, line, column, type, acc, n) do
-    interpolation(rest, binding, line, column+1, type, acc ++ [?}], n-1)
+  def parse([], unit, acc, [], root) do
+    predicate(unit ++ acc) ++ root
   end
-  def interpolation(<<v, rest::binary>>, binding, line, column, :var = type, acc, n) when v in ?0..?9 and acc != []  do
-    interpolation(rest, binding, line+1, column, type, acc ++ [v], n)
+  def parse([], unit, acc, context, root) when is_tuple(context) do
+    [{elem(context, 0), elem(context, 1), [unit ++ acc ++ root, elem(context, 2)]}]
   end
-  def interpolation(<<v, rest::binary>>, binding, line, column, :var = type, acc, n) when v in ?a..?z or v in ?A..?Z or (v == ?_ and acc != [])  do
-    interpolation(rest, binding, line+1, column, type, acc ++ [v], n)
+  def parse([node | rest], unit, acc, context, root) when is_comment(node) do
+    parse(rest, unit, acc, context, [node | root])
   end
-  def interpolation(<<?\n, rest::binary>>, binding, line, column, _type, acc, n) do
-    interpolation(rest, binding, line+1, column, :code, acc ++ [?\n], n)
+  def parse([{:all, m, _}, node | rest], unit, acc, [], root) when is_combinator(node) do
+    parse(rest, [], [], {elem(node, 0), elem(node, 1), [{:all, m, unit ++ acc ++ root}]}, [])
   end
-  def interpolation(<<v, rest::binary>>, binding, line, column, _type, acc, n) do
-    interpolation(rest, binding, line, column+1, :code, acc ++ [v], n)
+  def parse([node | rest], unit, acc, [], root) when is_combinator(node) do
+    parse(rest, [], [], {elem(node, 0), elem(node, 1), unit ++ acc ++ root}, [])
+  end
+  def parse([node | rest], unit, acc, context, root) when is_colon(node) do
+    parse(rest, [], [], context, [{elem(node, 0), elem(node, 1), unit ++ acc ++ root}])
+  end
+  def parse([ident, from, distinct, n, is, left | rest], unit, acc, context, root) when is_is(is) and is_from(from) and is_distinct(distinct) do
+    node = {elem(is, 0), elem(is, 1), [left, {elem(n, 0), elem(n, 1), [{elem(distinct, 0), elem(distinct, 1), [{elem(from, 0), elem(from, 1), [ident]}]}]}]}
+    {unit, acc, context, root} = insert_node(node, unit, acc, context, root)
+    parse(rest, unit, acc, context, root)
+  end
+  def parse([ident, from, distinct, is, left | rest], unit, acc, context, root) when is_is(is) and is_from(from) and is_distinct(distinct) do
+    node = {elem(is, 0), elem(is, 1), [left, {elem(distinct, 0), elem(distinct, 1), [{elem(from, 0), elem(from, 1), [ident]}]}]}
+    {unit, acc, context, root} = insert_node(node, unit, acc, context, root)
+    parse(rest, unit, acc, context, root)
+  end
+  def parse([node | rest], unit, acc, context, root) when is_colon(node) do
+    parse(rest, [], [], context, [{elem(node, 0), elem(node, 1), unit ++ acc ++ root}])
+  end
+  def parse([parens, node | rest], unit, acc, [], root) when is_parens(parens) and is_combinator(node) do
+    parse(rest, unit, acc, {elem(node, 0), elem(node, 1), [{elem(parens, 0), elem(parens, 1), parse(elem(parens, 2))}]}, root)
+  end
+  def parse([node | rest], unit, acc, context, root) when is_comma(node) do
+    parse(rest, [], [{elem(node, 0), elem(node, 1), predicate(unit)} | acc], context, root)
+  end
+  def parse([node | rest], unit, acc, context, root) do
+    {unit, acc, context, root} = insert_node(node, unit, acc, context, root)
+    parse(rest, unit, acc, context, root)
   end
 end
