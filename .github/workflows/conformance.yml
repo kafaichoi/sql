@@ -11,7 +11,13 @@ jobs:
         ports: ["5432:5432"]
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout ${{github.repository}}
+        uses: actions/checkout@v4
+      - name: Checkout sqltest
+        uses: actions/checkout@v4
+        with:
+            path: sqltest
+            repository: elliotchance/sqltest
       - uses: erlef/setup-beam@v1
         with:
           otp-version: 27
@@ -24,4 +30,4 @@ jobs:
           key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
             ${{ runner.os }}-mix-
-      - run: mix deps.get && mix test
+      - run: mix deps.get && mix sql.gen.test sqltest/standards/2016 && mix test
