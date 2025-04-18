@@ -32,70 +32,12 @@ iex(7)> inspect(sql)
 "select id, email from users where email = \"john@example.com\""
 ```
 
-### Extend the SQL AST or raise on unimplemented features with ease
-```elixir
-defmodule SQL.Adapters.TDS do
-  use SQL
-
-  @impl true
-  def token_to_sql({:binding, _, [value]}), do: "@#{value}"
-
-  # keywords not yet tokenized by the parser will end up as ident and passed through
-  # as illustrated below, but in our specific example we use it to raise an error.
-  # iex(1)> ~SQL[select count(*)]
-  # "select count (*)"
-  def token_to_sql({:ident, _, [~c"count"] = value}) do
-    raise "#{value} is not implemented for #{__MODULE__}"
-  end
-
-  # handle conversion from postgresql "users"."id" and users.id to [users].[id]
-  def token_to_sql({:. = tag, _, [{:"", _, [{:ident, _, _} = left]} , {:"", _, [{:ident, _, _} = right]}]}) do
-    "[#{token_to_sql(left)}]#{token_to_sql(tag)}[#{token_to_sql(right)}]"
-  end
-  def token_to_sql({:. = tag, _, [{:ident, _, _} = left, {:ident, _, _} = right]}) do
-    "[#{token_to_sql(left)}]#{token_to_sql(tag)}[#{token_to_sql(right)}]"
-  end
-  def token_to_sql({:. = tag, _, [{:"", _, [{:ident, _, _} = left]}, right]}) do
-    "[#{token_to_sql(left)}]#{token_to_sql(tag)}#{token_to_sql(right)}"
-  end
-  def token_to_sql({:. = tag, _, [{:ident, _, _} = left, right]}) do
-    "[#{token_to_sql(left)}]#{token_to_sql(tag)}#{token_to_sql(right)}"
-  end
-  def token_to_sql({:. = tag, _, [left, {:"", _, [{:ident, _, _} = right]}]}) do
-    "#{token_to_sql(left)}#{token_to_sql(tag)}[#{token_to_sql(right)}]"
-  end
-  def token_to_sql({:. = tag, _, [left, {:ident, _, _} = right]}) do
-    "#{token_to_sql(left)}#{token_to_sql(tag)}[#{token_to_sql(right)}]"
-  end
-
-  # fallback
-  def token_to_sql(token) do
-    IO.inspect token, label: :token_to_sql
-    SQL.String.token_to_sql(token, __MODULE__)
-  end
-end
-
-iex(8)> to_sql(~SQL[from db.users where "db"."users"."email" = #{email} select db.users.id, db.users.email])
-{"select [db].[users].[id], [db].[users].[email] from [db].[users] where [db].[users].[email] = @0", ["john@example.com"]}
-
-iex(9)> to_sql(~SQL[from db.users where "db"."users"."email" = #{email} select count(*)])
-** (RuntimeError) count is not implemented for Elixir.SQL.Adapters.TDS
-    iex:11: SQL.Adapters.TDS.token_to_sql/1
-    (elixir 1.18.0) lib/enum.ex:1815: anonymous fn/2 in Enum.map_join/3
-    (elixir 1.18.0) lib/enum.ex:4496: Enum.map_intersperse_list/3
-    (elixir 1.18.0) lib/enum.ex:1815: Enum.map_join/3
-    (sql 0.1.0) lib/string.ex:54: SQL.String.token_to_sql/2
-    (elixir 1.18.0) lib/enum.ex:1815: anonymous fn/2 in Enum.map_join/3
-    (elixir 1.18.0) lib/enum.ex:4496: Enum.map_intersperse_list/3
-    iex:9: (file)
-```
-
 ### Leverage the Enumerable protocol in your repository
 
 ```elixir
   defmodule MyApp.Repo do
     use Ecto.Repo, otp_app: :myapp, adapter: Ecto.Adapters.Postgres
-    use SQL
+    use SQL, adapter: SQL.Adapters.Postgres
 
     defimpl Enumerable, for: SQL do
       def count(_enumerable) do
@@ -130,7 +72,7 @@ by adding `sql` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:sql, "~> 0.1.0"}
+    {:sql, "~> 0.2.0"}
   ]
 end
 ```
