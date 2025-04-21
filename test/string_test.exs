@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2025 DBVisor
 
 defmodule SQL.StringTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   import SQL
 
   describe "with" do

@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2025 DBVisor
 
 defmodule SQL.Adapters.MySQLTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   use SQL, adapter: SQL.Adapters.MySQL
 
   describe "with" do

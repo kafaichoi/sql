@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2025 DBVisor
 
 defmodule SQL.Adapters.TDSTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   use SQL, adapter: SQL.Adapters.TDS
 
   describe "with" do

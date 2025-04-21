@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2025 DBVisor
 
 defmodule SQL.FormatterTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   test "features/1" do
     assert [{:sigils, [:SQL]}, {:extensions, nil}]  == SQL.MixFormatter.features([])
