@@ -38,6 +38,9 @@ defmodule SQL.Adapters.ANSI do
   def token_to_string({:parens, _, value}, mod) do
     "(#{mod.token_to_string(value)})"
   end
+  def token_to_string({:bracket, _, value}, mod) do
+    "[#{mod.token_to_string(value)}]"
+  end
   def token_to_string({:colon, _, value}, mod) do
     "; #{mod.token_to_string(value)}"
   end

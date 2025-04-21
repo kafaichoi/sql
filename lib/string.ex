@@ -33,6 +33,9 @@ defmodule SQL.String do
   def token_to_sql({:parens, _, value}, mod) do
     "(#{mod.token_to_sql(value)})"
   end
+  def token_to_sql({:bracket, _, value}, mod) do
+    "[#{mod.token_to_sql(value)}]"
+  end
   def token_to_sql({:colon, _, value}, mod) do
     "; #{mod.token_to_sql(value)}"
   end
