@@ -13,7 +13,7 @@ defmodule SQL do
       @doc false
       @behaviour SQL
       import SQL
-      def config, do: unquote(opts)
+      def sql_config, do: unquote(opts)
       def token_to_sql(token), do: token_to_sql(token)
       defoverridable token_to_sql: 1
     end
@@ -99,8 +99,8 @@ defmodule SQL do
 
   defimpl Inspect, for: SQL do
     def inspect(sql, _opts) do
-      if Kernel.function_exported?(sql.module, :config, 0) do
-        Enum.reduce(0..length(sql.params), to_string(sql), &String.replace(&2, sql.module.config()[:adapter].token_to_string({:binding, [], [&1]}), sql.module.config()[:adapter].token_to_string(Enum.at(sql.params, &1)), global: false))
+      if Kernel.function_exported?(sql.module, :sql_config, 0) do
+        Enum.reduce(0..length(sql.params), :persistent_term.get(sql.id), &String.replace(&2, sql.module.sql_config()[:adapter].token_to_string({:binding, [], [&1]}), sql.module.sql_config()[:adapter].token_to_string(Enum.at(sql.params, &1)), global: false))
       else
         Enum.reduce(0..length(sql.params), to_string(sql), &String.replace(&2, SQL.String.token_to_sql({:binding, [], [&1]}), SQL.String.token_to_sql(Enum.at(sql.params, &1))))
       end
@@ -110,7 +110,7 @@ defmodule SQL do
   defimpl String.Chars, for: SQL do
     def to_string(sql) do
       cond do
-        Kernel.function_exported?(sql.module, :config, 0) -> Enum.map(sql.query, &sql.module.config()[:adapter].token_to_string(&1))
+        Kernel.function_exported?(sql.module, :sql_config, 0) -> Enum.map(sql.query, &sql.module.sql_config()[:adapter].token_to_string(&1))
         Kernel.function_exported?(sql.module, :token_to_string, 2) -> Enum.map(sql.query, &sql.module.token_to_string(&1))
         true -> Enum.map(sql.query, &SQL.String.token_to_sql(&1))
       end
