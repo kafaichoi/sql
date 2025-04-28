@@ -15,6 +15,7 @@
  - MySQL adapter [#5](https://github.com/elixir-dbvisor/sql/pull/5).
  - PostgreSQL adapter [#5](https://github.com/elixir-dbvisor/sql/pull/5).
  - TDS adapter [#5](https://github.com/elixir-dbvisor/sql/pull/5).
+ - Improve SQL generation with 4-600x compared to Ecto [#7](https://github.com/elixir-dbvisor/sql/pull/7).
 
 ### Deprecation
  - token_to_sql/2 is deprecated in favor of SQL.Token behaviour token_to_string/2 [#5](https://github.com/elixir-dbvisor/sql/pull/5).

@@ -34,6 +34,8 @@ defmodule Mix.Tasks.Sql.Gen.Parser do
 
   defmodule <%= inspect @mod %> do
     @moduledoc false
+    @compile {:inline, parse: 1, parse: 5, predicate: 1, insert_node: 5}
+
     import Kernel, except: [is_boolean: 1]
 
     defguard is_and(node) when elem(node, 0) == :and
@@ -279,6 +281,7 @@ defmodule Mix.Tasks.Sql.Gen.Parser do
 
   defmodule <%= inspect @mod %> do
     @moduledoc false
+    @compile {:inline, lex: 9, lex: 4, meta: 3, merge: 3, type: 2, node: 5}
 
     defguard is_data_type(node) when elem(node, 0) in ~w[integer float ident quote double_quote backtick bracket parens .]a
     defguard is_newline(b) when b in <%= inspect(@newline) %>
@@ -299,9 +302,9 @@ defmodule Mix.Tasks.Sql.Gen.Parser do
     def expected_delimiter(:backtick), do: :"`"
     def expected_delimiter(type) when type in ~w[var code braces]a, do: :"}"
 
-    def lex(binary, binding, _meta, params \\\\ [], opts \\\\ [metadata: true]) do
-      case lex(binary, binary, [binding: binding, params: params] ++ opts, 0, 0, nil, [], [], 0) do
-        {"", _binary, opts, line, column, nil = type, [] = data, acc, _n} ->
+    def lex(binary, meta, params \\\\ 0, opts \\\\ [metadata: true]) do
+      case lex(binary, binary, [{:binding, []}, {:params, params}, {:meta, meta} | opts], 0, 0, nil, [], [], 0) do
+        {"", _binary, opts, line, column, nil = type, data, acc, _n} ->
           {:ok, opts, line, column, type, data, acc}
 
         {"", binary, _opts, end_line, end_column, type, _data, [{_, [line: line, column: column, file: file], _}|_], _n} when type in ~w[parens bracket double_quote quote backtick var code]a ->
@@ -324,37 +327,32 @@ defmodule Mix.Tasks.Sql.Gen.Parser do
       lex(rest, binary, opts, line, column+2, nil, [], insert_node(node(:comments, line, column, data, opts), acc), n)
     end
     def lex(<<b, rest::binary>>, binary, opts, line, column, :comments, data, acc, n) do
-      lex(rest, binary, opts, line, column+1, :comments, data ++ [b], acc, n)
+      lex(rest, binary, opts, line, column+1, :comments, [data | [b]], acc, n)
     end
     def lex(<<?{, ?{, rest::binary>>, binary, opts, line, column, _type, data, acc, n) do
       lex(rest, binary, opts, line, column+2, :var, data, acc, n)
     end
+    def lex(<<?}, ?}, rest::binary>>, binary, [_, _, _, {:format, true}] = opts, line, column, _type, data, acc, 0 = n), do: lex(rest, binary, opts, line, column+2, nil, [], insert_node(node(:binding, line, column, data, opts), acc), n)
     def lex(<<?}, ?}, rest::binary>>, binary, opts, line, column, type, data, acc, 0 = n) when type in ~w[code var]a do
-      if opts[:binding] do
-        opts = if type == :var do
-                  update_in(opts, [:params], &(&1 ++ [opts[:binding][List.to_atom(data)]]))
-                else
-                  update_in(opts, [:params], &(&1 ++ [elem(Code.eval_string(to_string(data), opts[:binding]), 0)]))
-                end
-        lex(rest, binary, opts, line, column+2, nil, [], insert_node(node(:binding, line, column, length(opts[:params]), opts), acc), n)
-      else
-        lex(rest, binary, opts, line, column+2, nil, [], insert_node(node(:binding, line, column, data, opts), acc), n)
-      end
+      opts = opts
+             |> Keyword.update!(:binding, &(&1 ++ [{type, IO.iodata_to_binary(data)}]))
+             |> Keyword.update!(:params, &(&1+1))
+      lex(rest, binary, opts, line, column+2, nil, [], insert_node(node(:binding, line, column, Keyword.get(opts, :params), opts), acc), n)
     end
     def lex(<<?}, rest::binary>>, binary, opts, line, column, :code = type, data, acc, n) do
-      lex(rest, binary, opts, line, column+1, type, data ++ [?}], acc, n-1)
+      lex(rest, binary, opts, line, column+1, type, [data | [?}]], acc, n-1)
     end
     def lex(<<b, rest::binary>>, binary, opts, line, column, type, data, acc, n) when type in ~w[var code]a and b in [?{] do
-      lex(rest, binary, opts, line, column+1, :code, data ++ [b], acc, n+1)
+      lex(rest, binary, opts, line, column+1, :code, [data | [b]], acc, n+1)
     end
     def lex(<<b, rest::binary>>, binary, opts, line, column, :var = type, data, acc, n) when b in ?0..?9 and data != [] do
-      lex(rest, binary, opts, line, column+1, type, data ++ [b], acc, n)
+      lex(rest, binary, opts, line, column+1, type, [data | [b]], acc, n)
     end
     def lex(<<b, rest::binary>>, binary, opts, line, column, :var = type, data, acc, n) when b in ?a..?z or b in ?A..?Z or (b == ?_ and data != []) do
-      lex(rest, binary, opts, line, column+1, type, data ++ [b], acc, n)
+      lex(rest, binary, opts, line, column+1, type, [data | [b]], acc, n)
     end
     def lex(<<b, rest::binary>>, binary, opts, line, column, type, data, acc, n) when type in ~w[var code]a do
-      lex(rest, binary, opts, line, column+1, :code, data ++ [b], acc, n)
+      lex(rest, binary, opts, line, column+1, :code, [data | [b]], acc, n)
     end
     def lex(<<b, rest::binary>>, binary, opts, line, column, type, data, acc, n) when b in [?(, ?[] do
       acc = case ident(type, data) do
@@ -384,7 +382,7 @@ defmodule Mix.Tasks.Sql.Gen.Parser do
       lex(rest, binary, opts, line, column+1, nil, [], insert_node(node(type, line, column, data, opts), acc), n)
     end
     def lex(<<b, rest::binary>>, binary, opts, line, column, type, data, acc, n) when type in ~w[double_quote quote backtick]a do
-      lex(rest, binary, opts, line, column+1, type, data ++ [b], acc, n)
+      lex(rest, binary, opts, line, column+1, type, [data | [b]], acc, n)
     end
     def lex(<<b::utf8, rest::binary>>, binary, opts, line, column, type, data, acc, n) when is_newline(b) do
       if data == [] do
@@ -517,7 +515,7 @@ defmodule Mix.Tasks.Sql.Gen.Parser do
     end
 
     def merge([] = data, _b, type) when type in ~w[double_quote quote backtick]a, do: data
-    def merge(data, b, _type), do: data ++ [b]
+    def merge(data, b, _type), do: [data | [b]]
 
     def type(?;), do: :colon
     def type(?,), do: :comma
@@ -545,18 +543,18 @@ defmodule Mix.Tasks.Sql.Gen.Parser do
     def type(?., :integer), do: :float
     def type(_b, _type), do: :ident
 
-    def meta(line, column, opts) do
-      if opts[:metadata], do: [line: line, column: column, file: opts[:file]], else: []
-    end
+    def meta(_line, _column, [_,_,_,{_,false}|_]), do: []
+    def meta(line, column, [_, _, {_, {_, _, file}} |_]), do: [line: line, column: column, file: file]
 
-    def node(:binding = tag, line, column, [idx], [{:binding, false}|_] = opts) do
-      {tag, meta(line, column, opts), Enum.at(opts[:params], idx)}
+    def node(:binding = tag, line, column, [idx], [{:binding, false}, {:params, params}|_] = opts) do
+      {tag, meta(line, column, opts), Enum.at(params, idx)}
     end
+    def node(:binding = tag, line, column, data, opts) when is_integer(data), do: {tag, meta(line, column, opts), [data]}
     def node(tag, line, column, data, opts) when tag in ~w[ident float integer double_quote quote backtick binding parens bracket . comment comments]a do
       data = case data do
                 [] -> data
                 [{_, _, _} | _] -> data
-                _ -> [data]
+                _ -> [IO.iodata_to_binary(data)]
               end
       {tag, meta(line, column, opts), data}
     end
@@ -571,7 +569,7 @@ defmodule Mix.Tasks.Sql.Gen.Parser do
     def ident(_type, [?(]), do: :parens
     def ident(_type, [?[]), do: :bracket
     <%= for keyword <- @keywords do %>
-      def ident(:ident, [<%= Enum.map_join(1..byte_size(keyword), ",", fn n -> "b\#{n}" end) %>]) when <%= guard(keyword) %>, do: <%= inspect(String.to_atom(String.downcase(keyword))) %>
+      def ident(:ident, <%= Enum.reduce(1..byte_size(keyword), "[]", fn n, acc -> "[\#{acc}, b\#{n}]" end) %>) when <%= guard(keyword) %>, do: <%= inspect(String.to_atom(String.downcase(keyword))) %>
     <% end %>
       def ident(type, _), do: type
   end
