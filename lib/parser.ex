@@ -3,6 +3,8 @@
 
 defmodule SQL.Parser do
   @moduledoc false
+  @compile {:inline, parse: 1, parse: 5, predicate: 1, insert_node: 5}
+
   import Kernel, except: [is_boolean: 1]
 
   defguard is_and(node) when elem(node, 0) == :and
