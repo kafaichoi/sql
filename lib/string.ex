@@ -91,7 +91,10 @@ defmodule SQL.String do
     "*"
   end
   def token_to_sql(value, _mod) when is_atom(value) do
-      "#{value}"
+    "#{value}"
+  end
+  def token_to_sql(value, _mod) when is_binary(value) do
+    "'#{value}'"
   end
   def token_to_sql(values, mod) when is_list(values) do
     Enum.reduce(values, "", fn

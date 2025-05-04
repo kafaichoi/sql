@@ -98,6 +98,9 @@ defmodule SQL.Adapters.ANSI do
   def token_to_string(value, _mod) when is_atom(value) do
     "#{value}"
   end
+  def token_to_string(value, _mod) when is_binary(value) do
+    "'#{value}'"
+  end
   def token_to_string(values, mod) when is_list(values) do
     Enum.reduce(values, "", fn
       token, "" -> mod.token_to_string(token)
