@@ -4,10 +4,9 @@
 defmodule Mix.Tasks.Sql.Gen.Parser do
   use Mix.Task
   import Mix.Generator
+  @moduledoc since: "0.2.0"
 
   @shortdoc "Generates a lexer and parser from the BNF rules"
-  @shortdoc since: "0.2.0"
-
   def run(_args) do
     rules = SQL.BNF.parse()
     space = Enum.map(rules["<space>"], fn <<c::utf8>> -> c end)

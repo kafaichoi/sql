@@ -4,10 +4,9 @@
 defmodule Mix.Tasks.Sql.Gen.Test do
   use Mix.Task
   import Mix.Generator
+  @moduledoc since: "0.2.0"
 
   @shortdoc "Generates test from the BNF rules"
-  @shortdoc since: "0.2.0"
-
   def run([base]) do
     create_file("test/conformance/e_test.exs", test_template([mod: SQL.Conformance.ETest, dir: Path.join(base, "E")]))
     create_file("test/conformance/f_test.exs", test_template([mod: SQL.Conformance.FTest, dir: Path.join(base, "F")]))

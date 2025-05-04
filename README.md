@@ -66,7 +66,7 @@ iex(7)> inspect(sql)
 ```
 
 ## Benchmark
-You can find benchmark results [here](benchmarks) or run `mix sql.bench`
+You can find benchmark results [here](https://github.com/elixir-dbvisor/sql/benchmarks) or run `mix sql.bench`
 
 ## Installation
 
