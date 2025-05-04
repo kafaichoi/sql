@@ -4,11 +4,11 @@
 defmodule SQL.String do
   @moduledoc false
 
+  @doc false
   def token_to_sql(value, mod \\ __MODULE__)
   def token_to_sql(value, _mod) when is_struct(value) do
     to_string(value)
   end
-
   def token_to_sql({tag, _, [{:parens, _, _} = value]}, mod) when tag in ~w[integer float update]a do
     "#{mod.token_to_sql(tag)}#{mod.token_to_sql(value)}"
   end

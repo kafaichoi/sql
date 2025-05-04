@@ -9,6 +9,7 @@ defmodule SQL.Adapters.MySQL do
 
   use SQL.Token
 
+  @doc false
   def token_to_string(value, mod \\ __MODULE__)
   def token_to_string(token, mod), do: SQL.Adapters.ANSI.token_to_string(token, mod)
 end

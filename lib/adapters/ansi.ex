@@ -9,11 +9,11 @@ defmodule SQL.Adapters.ANSI do
 
   use SQL.Token
 
+  @doc false
   def token_to_string(value, mod \\ __MODULE__)
   def token_to_string(value, mod) when is_struct(value) do
     to_string(%{value | module: mod})
   end
-
   def token_to_string({tag, _, [{:parens, _, _} = value]}, mod) when tag in ~w[integer float update]a do
     "#{mod.token_to_string(tag)}#{mod.token_to_string(value)}"
   end

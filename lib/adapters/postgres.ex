@@ -9,6 +9,7 @@ defmodule SQL.Adapters.Postgres do
 
   use SQL.Token
 
+  @doc false
   def token_to_string(value, mod \\ __MODULE__)
   def token_to_string({:not, _, [left, {:in, _, [{:binding, _, _} = right]}]}, mod), do: "#{mod.token_to_string(left)} != ANY(#{mod.token_to_string(right)})"
   def token_to_string({:in, _, [left, {:binding, _, _} = right]}, mod), do: "#{mod.token_to_string(left)} = ANY(#{mod.token_to_string(right)})"
