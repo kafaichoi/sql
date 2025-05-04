@@ -67,7 +67,6 @@ iex(7)> inspect(sql)
 
 ## Benchmark
 You can find benchmark results [here](benchmarks) or run `mix sql.bench`
-```
 
 ## Installation
 
