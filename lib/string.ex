@@ -97,10 +97,11 @@ defmodule SQL.String do
     "'#{value}'"
   end
   def token_to_sql(values, mod) when is_list(values) do
-    Enum.reduce(values, "", fn
-      token, "" -> mod.token_to_sql(token, mod)
-      {:comma, _, _} = token, acc -> acc <> mod.token_to_sql(token, mod)
-      token, acc -> acc <> " " <> mod.token_to_sql(token, mod)
+    values
+    |> Enum.reduce([], fn
+      token, [] = acc -> [acc | mod.token_to_sql(token, mod)]
+      {:comma, _, _} = token, acc -> [acc | mod.token_to_sql(token, mod)]
+      token, acc -> [acc, " "  | mod.token_to_sql(token, mod)]
     end)
   end
 end

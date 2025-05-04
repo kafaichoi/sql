@@ -102,10 +102,11 @@ defmodule SQL.Adapters.ANSI do
     "'#{value}'"
   end
   def token_to_string(values, mod) when is_list(values) do
-    Enum.reduce(values, "", fn
-      token, "" -> mod.token_to_string(token)
-      {:comma, _, _} = token, acc -> acc <> mod.token_to_string(token)
-      token, acc -> acc <> " " <> mod.token_to_string(token)
+    values
+    |> Enum.reduce([], fn
+      token, [] = acc -> [acc | mod.token_to_string(token)]
+      {:comma, _, _} = token, acc -> [acc | mod.token_to_string(token)]
+      token, acc -> [acc, " "  | mod.token_to_string(token)]
     end)
   end
 end
