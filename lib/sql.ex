@@ -34,8 +34,8 @@ defmodule SQL do
 
   ## Examples
       iex(1)> email = "john@example.com"
-      iex(2)> SQL.to_sql(~SQL"select id, email from users where email = \#{email}")
-      {"select id, email from users where email = $0", ["john@example.com"]}
+      iex(2)> SQL.to_sql(~SQL"select id, email from users where email = {{email}}")
+      {"select id, email from users where email = ?", ["john@example.com"]}
   """
   @doc since: "0.1.0"
   def to_sql(%{params: params, id: id, module: module}), do: {:persistent_term.get({module, id, :plan}), params}
@@ -47,7 +47,9 @@ defmodule SQL do
 
   ## Examples
       iex(1)> ~SQL"from users select id, email"
-      "select id, email from users"
+      ~SQL"\"\"
+      from users select id, email
+      "\"\"
   """
   @doc since: "0.1.0"
   defmacro sigil_SQL(left \\ [], right, modifiers) do
