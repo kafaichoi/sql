@@ -13,17 +13,50 @@ defmodule Mix.Tasks.Sql.Gen.Parser do
     whitespace = Enum.map(rules["<whitespace>"], fn <<c::utf8>> -> c end)
     newline = Enum.map(rules["<newline>"], fn <<c::utf8>> -> c end)
 
-    keywords = String.split(rules["<reserved word>"], "|") ++ String.split(rules["<non-reserved word>"], "|") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+    keywords =
+      (String.split(rules["<reserved word>"], "|") ++
+         String.split(rules["<non-reserved word>"], "|"))
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+
     keywords = keywords ++ ~w[LIMIT ILIKE BACKWARD FORWARD ISNULL NOTNULL]
-    create_file("lib/lexer.ex", lexer_template([mod: SQL.Lexer, keywords: keywords, space: space, whitespace: whitespace, newline: newline]))
-    create_file("lib/parser.ex", parser_template([mod: SQL.Parser, keywords: Enum.map(keywords, &String.to_atom(String.downcase(&1)))]))
+
+    create_file(
+      "lib/lexer.ex",
+      lexer_template(
+        mod: SQL.Lexer,
+        keywords: keywords,
+        space: space,
+        whitespace: whitespace,
+        newline: newline
+      )
+    )
+
+    create_file(
+      "lib/parser.ex",
+      parser_template(
+        mod: SQL.Parser,
+        keywords: Enum.map(keywords, &String.to_atom(String.downcase(&1)))
+      )
+    )
   end
 
   def guard(keyword) do
-    {value, _n} = for <<k <- String.downcase(keyword)>>, reduce: {[], 1} do
-      {[], n} -> {{:in, [context: Elixir, imports: [{2, Kernel}]], [{:"b#{n}", [], Elixir}, Enum.uniq(~c"#{<<k>>}#{String.upcase(<<k>>)}")]}, n+1}
-      {left, n} -> {{:and, [context: Elixir, imports: [{2, Kernel}]], [left, {:in, [context: Elixir, imports: [{2, Kernel}]], [{:"b#{n}", [], Elixir}, Enum.uniq(~c"#{<<k>>}#{String.upcase(<<k>>)}")]}]}, n+1}
-    end
+    {value, _n} =
+      for <<k <- String.downcase(keyword)>>, reduce: {[], 1} do
+        {[], n} ->
+          {{:in, [context: Elixir, imports: [{2, Kernel}]],
+            [{:"b#{n}", [], Elixir}, Enum.uniq(~c"#{<<k>>}#{String.upcase(<<k>>)}")]}, n + 1}
+
+        {left, n} ->
+          {{:and, [context: Elixir, imports: [{2, Kernel}]],
+            [
+              left,
+              {:in, [context: Elixir, imports: [{2, Kernel}]],
+               [{:"b#{n}", [], Elixir}, Enum.uniq(~c"#{<<k>>}#{String.upcase(<<k>>)}")]}
+            ]}, n + 1}
+      end
+
     Macro.to_string(value)
   end
 
@@ -156,6 +189,9 @@ defmodule Mix.Tasks.Sql.Gen.Parser do
     def insert_node({:with = tag, meta, []}, [{:ident, _, _} = l, {:parens, _, _} = r, {:as = t2, m2, a}], [], context, root) do
       {[], [], context, root ++ [{tag, meta, [{t2, m2, [[l, r] | a]}]}]}
     end
+    def insert_node({:with = tag, meta, []}, unit, acc, context, root) do
+      {[], [], context, [{tag, meta, List.wrap(predicate(unit ++ acc))} | root]}
+    end
     def insert_node({tag, meta, []}, unit, acc, context, root) when tag in ~w[by in references]a do
       {[{tag, meta, predicate(unit ++ acc)}], [], context, root}
     end
@@ -272,7 +308,6 @@ defmodule Mix.Tasks.Sql.Gen.Parser do
     end
   end
   """)
-
 
   embed_template(:lexer, """
   # SPDX-License-Identifier: Apache-2.0

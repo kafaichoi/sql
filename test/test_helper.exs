@@ -4,4 +4,5 @@
 defmodule SQL.Repo do
   use Ecto.Repo, otp_app: :sql, adapter: Ecto.Adapters.Postgres
 end
+
 ExUnit.start()

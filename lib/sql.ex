@@ -3,9 +3,9 @@
 
 defmodule SQL do
   @moduledoc "README.md"
-               |> File.read!()
-               |> String.split("<!-- MDOC !-->")
-               |> Enum.fetch!(1)
+             |> File.read!()
+             |> String.split("<!-- MDOC !-->")
+             |> Enum.fetch!(1)
   @moduledoc since: "0.1.0"
 
   @adapters [SQL.Adapters.ANSI, SQL.Adapters.MySQL, SQL.Adapters.Postgres, SQL.Adapters.TDS]
@@ -21,6 +21,7 @@ defmodule SQL do
       defoverridable token_to_sql: 1
     end
   end
+
   @optional_callbacks token_to_sql: 1
 
   @doc """
@@ -70,7 +71,8 @@ defmodule SQL do
   @doc false
   @doc since: "0.1.0"
   def parse(binary) do
-    {:ok, _opts, _, _, _, _, tokens} = SQL.Lexer.lex(binary, __ENV__.file, 0, [format: true])
+    {:ok, _opts, _, _, _, _, tokens} = SQL.Lexer.lex(binary, __ENV__.file, 0, format: true)
+
     tokens
     |> SQL.Parser.parse()
     |> to_query()
@@ -81,17 +83,25 @@ defmodule SQL do
   @doc since: "0.1.0"
   @acc ~w[for create drop insert alter with update delete select set fetch from join where group having window except intersect union order limit offset lock colon in declare start grant revoke commit rollback open close comment comments into]a
   def to_query([value | _] = tokens) when is_tuple(value) and elem(value, 0) in @acc do
-    Enum.reduce(@acc, [], fn key, acc -> acc ++ for {k, meta, v} <- Enum.filter(tokens, &(elem(&1, 0) == key)), do: {k, meta, Enum.map(v, &to_query/1)} end)
+    Enum.reduce(@acc, [], fn key, acc ->
+      acc ++
+        for {k, meta, v} <- Enum.filter(tokens, &(elem(&1, 0) == key)),
+            do: {k, meta, Enum.map(v, &to_query/1)}
+    end)
   end
+
   def to_query({:parens = tag, meta, values}) do
     {tag, meta, to_query(values)}
   end
+
   def to_query({tag, meta, values}) do
     {tag, meta, Enum.map(values, &to_query/1)}
   end
+
   def to_query(tokens) when is_list(tokens) do
     Enum.map(tokens, &to_query/1)
   end
+
   def to_query(token) do
     token
   end
@@ -100,29 +110,41 @@ defmodule SQL do
   def to_string(tokens, module) when module in @adapters do
     tokens
     |> Enum.reduce([], fn
-      token, [] = acc -> [acc | module.token_to_string(token)]
+      token, [] = acc ->
+        [acc | module.token_to_string(token)]
+
       token, acc ->
-      case module.token_to_string(token) do
-        <<";", _::binary>> = v -> [acc | v]
-        v -> [acc, " " | v]
-      end
+        case module.token_to_string(token) do
+          <<";", _::binary>> = v -> [acc | v]
+          v -> [acc, " " | v]
+        end
     end)
     |> IO.iodata_to_binary()
   end
+
   def to_string(tokens, module) do
-    fun = cond do
-      Kernel.function_exported?(module, :sql_config, 0) -> &module.sql_config()[:adapter].token_to_string(&1)
-      Kernel.function_exported?(module, :token_to_string, 2) -> &module.token_to_string(&1)
-      true -> &SQL.String.token_to_sql(&1)
-    end
+    fun =
+      cond do
+        Kernel.function_exported?(module, :sql_config, 0) ->
+          &module.sql_config()[:adapter].token_to_string(&1)
+
+        Kernel.function_exported?(module, :token_to_string, 2) ->
+          &module.token_to_string(&1)
+
+        true ->
+          &SQL.String.token_to_sql(&1)
+      end
+
     tokens
     |> Enum.reduce([], fn
-      token, [] = acc -> [acc | fun.(token)]
+      token, [] = acc ->
+        [acc | fun.(token)]
+
       token, acc ->
-      case fun.(token) do
-        <<";", _::binary>> = v -> [acc | v]
-        v -> [acc, " " | v]
-      end
+        case fun.(token) do
+          <<";", _::binary>> = v -> [acc | v]
+          v -> [acc, " " | v]
+        end
     end)
     |> IO.iodata_to_binary()
   end
@@ -133,26 +155,53 @@ defmodule SQL do
       {:static, data} ->
         {:ok, opts, _, _, _, _, tokens} = SQL.Lexer.lex(data, env.file)
         tokens = SQL.to_query(SQL.Parser.parse(tokens))
-        string = if mod = env.module do
+
+        string =
+          if mod = env.module do
             SQL.to_string(tokens, Module.get_attribute(mod, :sql_adapter))
-            else
+          else
             SQL.to_string(tokens, SQL.Adapters.ANSI)
-        end
-        sql = struct(SQL, tokens: tokens, string: string, module: env.module, inspect: data, id: id(data))
+          end
+
+        sql =
+          struct(SQL,
+            tokens: tokens,
+            string: string,
+            module: env.module,
+            inspect: data,
+            id: id(data)
+          )
+
         quote bind_quoted: [params: opts[:binding], sql: Macro.escape(sql)] do
-            %{sql | params: cast_params(params, [], binding())}
+          %{sql | params: cast_params(params, [], binding())}
         end
 
       {:dynamic, data} ->
         sql = struct(SQL, id: id(data), module: env.module)
-        quote bind_quoted: [left: Macro.unpipe(left), right: right, file: env.file, data: data, sql: Macro.escape(sql)] do
-          {t, p} = Enum.reduce(left, {[], []}, fn
-            {[], 0}, acc   -> acc
-            {v, 0}, {t, p} -> {t ++ v.tokens, p ++ v.params}
+
+        quote bind_quoted: [
+                left: Macro.unpipe(left),
+                right: right,
+                file: env.file,
+                data: data,
+                sql: Macro.escape(sql)
+              ] do
+          {t, p} =
+            Enum.reduce(left, {[], []}, fn
+              {[], 0}, acc -> acc
+              {v, 0}, {t, p} -> {t ++ v.tokens, p ++ v.params}
             end)
+
           {tokens, params} = tokens(right, file, length(p), sql.id)
           tokens = t ++ tokens
-          %{sql | params: cast_params(params, p, binding()), tokens: tokens, string: plan(tokens, sql.id, sql.module), inspect: plan_inspect(data, sql.id)}
+
+          %{
+            sql
+            | params: cast_params(params, p, binding()),
+              tokens: tokens,
+              string: plan(tokens, sql.id, sql.module),
+              inspect: plan_inspect(data, sql.id)
+          }
         end
     end
   end
@@ -162,9 +211,9 @@ defmodule SQL do
     left
     |> Macro.unpipe()
     |> Enum.reduce({:static, right}, fn
-        {[], 0}, acc -> acc
-        {{:sigil_SQL, _meta, [{:<<>>, _, value}, []]}, 0}, {type, acc} -> {type, [value, ?\s, acc]}
-        {{_, _, _} = var, 0}, {_, acc} -> {:dynamic, [var, ?\s, acc]}
+      {[], 0}, acc -> acc
+      {{:sigil_SQL, _meta, [{:<<>>, _, value}, []]}, 0}, {type, acc} -> {type, [value, ?\s, acc]}
+      {{_, _, _} = var, 0}, {_, acc} -> {:dynamic, [var, ?\s, acc]}
     end)
     |> case do
       {:static, data} -> {:static, IO.iodata_to_binary(data)}
@@ -186,14 +235,15 @@ defmodule SQL do
   @doc false
   def cast_params(bindings, params, binding) do
     Enum.reduce(bindings, params, fn
-        {:var, var}, acc -> if v = binding[String.to_atom(var)], do: acc ++ [v], else: acc
-        {:code, code}, acc -> acc ++ [elem(Code.eval_string(code, binding), 0)]
+      {:var, var}, acc -> if v = binding[String.to_atom(var)], do: acc ++ [v], else: acc
+      {:code, code}, acc -> acc ++ [elem(Code.eval_string(code, binding), 0)]
     end)
   end
 
   @doc false
   def tokens(binary, file, count, id) do
     key = {id, :lex}
+
     if result = :persistent_term.get(key, nil) do
       result
     else
@@ -207,6 +257,7 @@ defmodule SQL do
   @doc false
   def plan(tokens, id, module) do
     key = {module, id, :plan}
+
     if string = :persistent_term.get(key, nil) do
       string
     else
@@ -219,19 +270,20 @@ defmodule SQL do
   @doc false
   def plan_inspect(data, id) do
     key = {id, :inspect}
+
     if inspect = :persistent_term.get(key, nil) do
-        inspect
+      inspect
     else
-        inspect = data
-                |> Enum.map(fn
-                ast when is_struct(ast) -> ast.inspect
-                x -> x
-                end)
-                |> IO.iodata_to_binary()
+      inspect =
+        data
+        |> Enum.map(fn
+          ast when is_struct(ast) -> ast.inspect
+          x -> x
+        end)
+        |> IO.iodata_to_binary()
 
-
-        :persistent_term.put(key, inspect)
-        inspect
+      :persistent_term.put(key, inspect)
+      inspect
     end
   end
 end

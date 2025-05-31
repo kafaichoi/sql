@@ -7,49 +7,97 @@ defmodule SQL.Adapters.TDSTest do
 
   describe "with" do
     test "recursive" do
-      assert "with recursive temp (n, fact) as (select 0, 1 union all select n + 1, (n + 1) * fact from temp where n < 9)" == to_string(~SQL[with recursive temp (n, fact) as (select 0, 1 union all select n+1, (n+1)*fact from temp where n < 9)])
+      assert "with recursive temp (n, fact) as (select 0, 1 union all select n + 1, (n + 1) * fact from temp where n < 9)" ==
+               to_string(
+                 ~SQL[with recursive temp (n, fact) as (select 0, 1 union all select n + 1, (n + 1) * fact from temp where n < 9)]
+               )
     end
 
     test "regular" do
-      assert "with temp (n, fact) as (select 0, 1 union all select n + 1, (n + 1) * fact from temp where n < 9)" == to_string(~SQL[with temp (n, fact) as (select 0, 1 union all select n+1, (n+1)*fact from temp where n < 9)])
+      assert "with temp (n, fact) as (select 0, 1 union all select n + 1, (n + 1) * fact from temp where n < 9)" ==
+               to_string(
+                 ~SQL[with temp (n, fact) as (select 0, 1 union all select n + 1, (n + 1) * fact from temp where n < 9)]
+               )
     end
   end
 
   describe "combinations" do
     test "except" do
-      assert "(select id from users) except (select id from users)" == to_string(~SQL[(select id from users) except (select id from users)])
-      assert "(select id from users) except select id from users" == to_string(~SQL[(select id from users) except select id from users])
-      assert "select id from users except (select id from users)" == to_string(~SQL[select id from users except (select id from users)])
-      assert "select id from users except select id from users" == to_string(~SQL[select id from users except select id from users])
+      assert "(select id from users) except (select id from users)" ==
+               to_string(~SQL[(select id from users) except (select id from users)])
 
-      assert "(select id from users) except all (select id from users)" == to_string(~SQL[(select id from users) except all (select id from users)])
-      assert "(select id from users) except all select id from users" == to_string(~SQL[(select id from users) except all select id from users])
-      assert "select id from users except all (select id from users)" == to_string(~SQL[select id from users except all (select id from users)])
-      assert "select id from users except all select id from users" == to_string(~SQL[select id from users except all select id from users])
+      assert "(select id from users) except select id from users" ==
+               to_string(~SQL[(select id from users) except select id from users])
+
+      assert "select id from users except (select id from users)" ==
+               to_string(~SQL[select id from users except (select id from users)])
+
+      assert "select id from users except select id from users" ==
+               to_string(~SQL[select id from users except select id from users])
+
+      assert "(select id from users) except all (select id from users)" ==
+               to_string(~SQL[(select id from users) except all (select id from users)])
+
+      assert "(select id from users) except all select id from users" ==
+               to_string(~SQL[(select id from users) except all select id from users])
+
+      assert "select id from users except all (select id from users)" ==
+               to_string(~SQL[select id from users except all (select id from users)])
+
+      assert "select id from users except all select id from users" ==
+               to_string(~SQL[select id from users except all select id from users])
     end
 
     test "intersect" do
-      assert "(select id from users) intersect (select id from users)" == to_string(~SQL[(select id from users) intersect (select id from users)])
-      assert "(select id from users) intersect select id from users" == to_string(~SQL[(select id from users) intersect select id from users])
-      assert "select id from users intersect (select id from users)" == to_string(~SQL[select id from users intersect (select id from users)])
-      assert "select id from users intersect select id from users" == to_string(~SQL[select id from users intersect select id from users])
+      assert "(select id from users) intersect (select id from users)" ==
+               to_string(~SQL[(select id from users) intersect (select id from users)])
 
-      assert "(select id from users) intersect all (select id from users)" == to_string(~SQL[(select id from users) intersect all (select id from users)])
-      assert "(select id from users) intersect all select id from users" == to_string(~SQL[(select id from users) intersect all select id from users])
-      assert "select id from users intersect all (select id from users)" == to_string(~SQL[select id from users intersect all (select id from users)])
-      assert "select id from users intersect all select id from users" == to_string(~SQL[select id from users intersect all select id from users])
+      assert "(select id from users) intersect select id from users" ==
+               to_string(~SQL[(select id from users) intersect select id from users])
+
+      assert "select id from users intersect (select id from users)" ==
+               to_string(~SQL[select id from users intersect (select id from users)])
+
+      assert "select id from users intersect select id from users" ==
+               to_string(~SQL[select id from users intersect select id from users])
+
+      assert "(select id from users) intersect all (select id from users)" ==
+               to_string(~SQL[(select id from users) intersect all (select id from users)])
+
+      assert "(select id from users) intersect all select id from users" ==
+               to_string(~SQL[(select id from users) intersect all select id from users])
+
+      assert "select id from users intersect all (select id from users)" ==
+               to_string(~SQL[select id from users intersect all (select id from users)])
+
+      assert "select id from users intersect all select id from users" ==
+               to_string(~SQL[select id from users intersect all select id from users])
     end
 
     test "union" do
-      assert "(select id from users) union (select id from users)" == to_string(~SQL[(select id from users) union (select id from users)])
-      assert "(select id from users) union select id from users" == to_string(~SQL[(select id from users) union select id from users])
-      assert "select id from users union (select id from users)" == to_string(~SQL[select id from users union (select id from users)])
-      assert "select id from users union select id from users" == to_string(~SQL[select id from users union select id from users])
+      assert "(select id from users) union (select id from users)" ==
+               to_string(~SQL[(select id from users) union (select id from users)])
 
-      assert "(select id from users) union all (select id from users)" == to_string(~SQL[(select id from users) union all (select id from users)])
-      assert "(select id from users) union all select id from users" == to_string(~SQL[(select id from users) union all select id from users])
-      assert "select id from users union all (select id from users)" == to_string(~SQL[select id from users union all (select id from users)])
-      assert "select id from users union all select id from users" == to_string(~SQL[select id from users union all select id from users])
+      assert "(select id from users) union select id from users" ==
+               to_string(~SQL[(select id from users) union select id from users])
+
+      assert "select id from users union (select id from users)" ==
+               to_string(~SQL[select id from users union (select id from users)])
+
+      assert "select id from users union select id from users" ==
+               to_string(~SQL[select id from users union select id from users])
+
+      assert "(select id from users) union all (select id from users)" ==
+               to_string(~SQL[(select id from users) union all (select id from users)])
+
+      assert "(select id from users) union all select id from users" ==
+               to_string(~SQL[(select id from users) union all select id from users])
+
+      assert "select id from users union all (select id from users)" ==
+               to_string(~SQL[select id from users union all (select id from users)])
+
+      assert "select id from users union all select id from users" ==
+               to_string(~SQL[select id from users union all select id from users])
     end
   end
 
@@ -57,7 +105,10 @@ defmodule SQL.Adapters.TDSTest do
     test "select" do
       assert "select id" == to_string(~SQL[select id])
       assert "select id, id as di" == to_string(~SQL[select id, id as di])
-      assert "select id, (select id from users) as di" == to_string(~SQL[select id, (select id from users) as di])
+
+      assert "select id, (select id from users) as di" ==
+               to_string(~SQL[select id, (select id from users) as di])
+
       assert "select unknownn" == to_string(~SQL[select unknownn])
       assert "select truee" == to_string(~SQL[select truee])
       assert "select falsee" == to_string(~SQL[select falsee])
@@ -67,7 +118,9 @@ defmodule SQL.Adapters.TDSTest do
       assert "select ascc" == to_string(~SQL[select ascc])
       assert "select descc" == to_string(~SQL[select descc])
       assert "select distinct id" == to_string(~SQL[select distinct id])
-      assert "select distinct on (id, users) id" == to_string(~SQL[select distinct on (id, users) id])
+
+      assert "select distinct on (id, users) id" ==
+               to_string(~SQL[select distinct on (id, users) id])
     end
 
     test "from" do
@@ -90,16 +143,22 @@ defmodule SQL.Adapters.TDSTest do
       assert "join users on id = id" == to_string(~SQL[join users on id = id])
       assert "join users u on id = id" == to_string(~SQL[join users u on id = id])
       assert "join users on (id = id)" == to_string(~SQL[join users on (id = id)])
-      assert "join (select * from users) on (id = id)" == to_string(~SQL[join (select * from users) on (id = id)])
-      assert "join (select * from users) u on (id = id)" == to_string(~SQL[join (select * from users) u on (id = id)])
+
+      assert "join (select * from users) on (id = id)" ==
+               to_string(~SQL[join (select * from users) on (id = id)])
+
+      assert "join (select * from users) u on (id = id)" ==
+               to_string(~SQL[join (select * from users) u on (id = id)])
     end
 
     test "where" do
       assert "where 1 = 2" == to_string(~SQL[where 1 = 2])
-      assert "where 1 = 2" == to_string(~SQL[where 1=2])
+      assert "where 1 = 2" == to_string(~SQL[where 1 = 2])
       assert "where 1 != 2" == to_string(~SQL[where 1 != 2])
       assert "where 1 <> 2" == to_string(~SQL[where 1 <> 2])
-      assert "where 1 = 2 and id = users.id and id > 3 or true" == to_string(~SQL[where 1 = 2 and id = users.id and id > 3 or true])
+
+      assert "where 1 = 2 and id = users.id and id > 3 or true" ==
+               to_string(~SQL[where 1 = 2 and id = users.id and id > 3 or true])
     end
 
     test "group by" do
@@ -117,7 +176,9 @@ defmodule SQL.Adapters.TDSTest do
     test "order by" do
       assert "order by id" == to_string(~SQL[order by id])
       assert "order by users.id" == to_string(~SQL[order by users.id])
-      assert "order by id, users.id, users.id asc, id desc" == to_string(~SQL[order by id, users.id, users.id asc, id desc])
+
+      assert "order by id, users.id, users.id asc, id desc" ==
+               to_string(~SQL[order by id, users.id, users.id asc, id desc])
     end
 
     test "offset" do
@@ -183,7 +244,9 @@ defmodule SQL.Adapters.TDSTest do
     test "qouted" do
       assert "select \"db.users.id\"" == to_string(~SQL[select "db.users.id"])
       assert "select 'db.users'" == to_string(~SQL[select 'db.users'])
-      assert "select \"db.users.id\", 'db.users'" == to_string(~SQL[select "db.users.id", 'db.users'])
+
+      assert "select \"db.users.id\", 'db.users'" ==
+               to_string(~SQL[select "db.users.id", 'db.users'])
     end
   end
 
@@ -225,59 +288,77 @@ defmodule SQL.Adapters.TDSTest do
   describe "operators" do
     test "=" do
       assert "where id = 1" == to_string(~SQL[where id = 1])
-      assert "where id = 1" == to_string(~SQL[where id=1])
+      assert "where id = 1" == to_string(~SQL[where id = 1])
     end
+
     test "-" do
       assert "where id - 1" == to_string(~SQL[where id - 1])
-      assert "where id - 1" == to_string(~SQL[where id-1])
+      assert "where id - 1" == to_string(~SQL[where id - 1])
     end
+
     test "+" do
       assert "where id + 1" == to_string(~SQL[where id + 1])
-      assert "where id + 1" == to_string(~SQL[where id+1])
+      assert "where id + 1" == to_string(~SQL[where id + 1])
     end
+
     test "*" do
       assert "where id * 1" == to_string(~SQL[where id * 1])
-      assert "where id * 1" == to_string(~SQL[where id*1])
+      assert "where id * 1" == to_string(~SQL[where id * 1])
     end
+
     test "/" do
       assert "where id / 1" == to_string(~SQL[where id / 1])
-      assert "where id / 1" == to_string(~SQL[where id/1])
+      assert "where id / 1" == to_string(~SQL[where id / 1])
     end
+
     test "<>" do
       assert "where id <> 1" == to_string(~SQL[where id <> 1])
-      assert "where id <> 1" == to_string(~SQL[where id<>1])
+      assert "where id <> 1" == to_string(~SQL[where id <> 1])
     end
+
     test ">" do
       assert "where id > 1" == to_string(~SQL[where id > 1])
-      assert "where id > 1" == to_string(~SQL[where id>1])
+      assert "where id > 1" == to_string(~SQL[where id > 1])
     end
+
     test "<" do
       assert "where id < 1" == to_string(~SQL[where id < 1])
-      assert "where id < 1" == to_string(~SQL[where id<1])
+      assert "where id < 1" == to_string(~SQL[where id < 1])
     end
+
     test ">=" do
       assert "where id >= 1" == to_string(~SQL[where id >= 1])
-      assert "where id >= 1" == to_string(~SQL[where id>=1])
+      assert "where id >= 1" == to_string(~SQL[where id >= 1])
     end
+
     test "<=" do
       assert "where id <= 1" == to_string(~SQL[where id <= 1])
-      assert "where id <= 1" == to_string(~SQL[where id<=1])
+      assert "where id <= 1" == to_string(~SQL[where id <= 1])
     end
+
     test "between" do
       assert "where id between 1 and 2" == to_string(~SQL[where id between 1 and 2])
       assert "where id not between 1 and 2" == to_string(~SQL[where id not between 1 and 2])
-      assert "where id between symmetric 1 and 2" == to_string(~SQL[where id between symmetric 1 and 2])
-      assert "where id not between symmetric 1 and 2" == to_string(~SQL[where id not between symmetric 1 and 2])
+
+      assert "where id between symmetric 1 and 2" ==
+               to_string(~SQL[where id between symmetric 1 and 2])
+
+      assert "where id not between symmetric 1 and 2" ==
+               to_string(~SQL[where id not between symmetric 1 and 2])
     end
+
     test "like" do
       assert "where id like 1" == to_string(~SQL[where id like 1])
     end
+
     test "ilike" do
       assert "where id ilike 1" == to_string(~SQL[where id ilike 1])
     end
+
     test "in" do
       assert "where id in (1, 2)" == to_string(~SQL[where id in (1, 2)])
     end
+
     test "is" do
       assert "where id is null" == to_string(~SQL[where id is null])
       assert "where id is false" == to_string(~SQL[where id is false])
@@ -295,6 +376,7 @@ defmodule SQL.Adapters.TDSTest do
       assert "where id isnull" == to_string(~SQL[where id isnull])
       assert "where id notnull" == to_string(~SQL[where id notnull])
     end
+
     test "as" do
       assert "select id as dd" == to_string(~SQL[select id as dd])
     end

@@ -142,6 +142,34 @@ defmodule SQLTest do
     test "regular" do
       assert "with temp (n, fact) as (select 0, 1 union all select n + 1, (n + 1) * fact from temp where n < 9)" == to_string(~SQL[with temp (n, fact) as (select 0, 1 union all select n+1, (n+1)*fact from temp where n < 9)])
     end
+
+    test "debug simple with" do
+      sql = ~SQL[with foo (id) as (select 1)]
+      output = to_string(sql)
+      IO.puts("DEBUG WITH OUTPUT: #{output}")
+      assert output == "with foo (id) as (select 1)"
+    end
+
+    test "debug complex with" do
+          sql = ~SQL[
+    with subset as (
+      select distinct on (e.id) e.id as row_id
+      from "pacman.public".entities as e
+      join "pacman.public".transactions as t on t.entity_id = e.id
+      where e.status = 'done'
+        and t.strategy = 'unknown'
+        and t.sell_record_id is null
+        and t.buy_date < now() - interval '365 days'
+    )
+    update "pacman.public".entities
+    set status = 'stale'
+    from subset
+    where id = subset.row_id
+    ]
+
+      output = to_string(sql)
+      assert output == "with subset as(select distinct on (e.id) e.id as row_id from \"pacman.public\".entities as e join \"pacman.public\".transactions as t on t.entity_id = e.id where e.status = 'done' and t.strategy = 'unknown' and t.sell_record_id is null and t.buy_date < now () - interval '365 days') update \"pacman.public\".entities set status = 'stale' from subset where id = subset.row_id"
+    end
   end
 
   describe "combinations" do

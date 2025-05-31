@@ -12,7 +12,8 @@ defmodule SQL.MixProject do
       version: @version,
       elixir: "~> 1.18",
       deps: deps(),
-      description: "Brings an extensible SQL parser and sigil to Elixir, confidently write SQL with automatic parameterized queries.",
+      description:
+        "Brings an extensible SQL parser and sigil to Elixir, confidently write SQL with automatic parameterized queries.",
       name: "SQL",
       docs: docs(),
       package: package(),
@@ -29,13 +30,13 @@ defmodule SQL.MixProject do
   end
 
   defp docs do
-      [
-        main: "readme",
-        api_reference: false,
-        source_ref: "v#{@version}",
-        canonical: "https://hexdocs.pm/sql",
-        extras: ["CHANGELOG.md", "README.md", "LICENSE"]
-      ]
+    [
+      main: "readme",
+      api_reference: false,
+      source_ref: "v#{@version}",
+      canonical: "https://hexdocs.pm/sql",
+      extras: ["CHANGELOG.md", "README.md", "LICENSE"]
+    ]
   end
 
   defp deps do
@@ -44,7 +45,7 @@ defmodule SQL.MixProject do
       {:ecto_sql, "~> 3.12", only: [:dev, :test]},
       {:ex_doc, "~> 0.37", only: :dev},
       {:postgrex, ">= 0.0.0", only: [:dev, :test]},
-      {:yamerl, ">= 0.0.0", only: [:dev, :test]},
+      {:yamerl, ">= 0.0.0", only: [:dev, :test]}
     ]
   end
 end

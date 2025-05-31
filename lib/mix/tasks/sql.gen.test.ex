@@ -8,14 +8,32 @@ defmodule Mix.Tasks.Sql.Gen.Test do
 
   @shortdoc "Generates test from the BNF rules"
   def run([base]) do
-    create_file("test/conformance/e_test.exs", test_template([mod: SQL.Conformance.ETest, dir: Path.join(base, "E")]))
-    create_file("test/conformance/f_test.exs", test_template([mod: SQL.Conformance.FTest, dir: Path.join(base, "F")]))
-    create_file("test/conformance/s_test.exs", test_template([mod: SQL.Conformance.STest, dir: Path.join(base, "S")]))
-    create_file("test/conformance/t_test.exs", test_template([mod: SQL.Conformance.TTest, dir: Path.join(base, "T")]))
+    create_file(
+      "test/conformance/e_test.exs",
+      test_template(mod: SQL.Conformance.ETest, dir: Path.join(base, "E"))
+    )
+
+    create_file(
+      "test/conformance/f_test.exs",
+      test_template(mod: SQL.Conformance.FTest, dir: Path.join(base, "F"))
+    )
+
+    create_file(
+      "test/conformance/s_test.exs",
+      test_template(mod: SQL.Conformance.STest, dir: Path.join(base, "S"))
+    )
+
+    create_file(
+      "test/conformance/t_test.exs",
+      test_template(mod: SQL.Conformance.TTest, dir: Path.join(base, "T"))
+    )
   end
 
   def generate_test(dir) do
-    for path <- File.ls!(dir), path =~ ".tests.yml", [{~c"feature", feature}, {~c"id", id}, {~c"sql", sql}] <- :yamerl.decode_file(to_charlist(Path.join(dir, path))) do
+    for path <- File.ls!(dir),
+        path =~ ".tests.yml",
+        [{~c"feature", feature}, {~c"id", id}, {~c"sql", sql}] <-
+          :yamerl.decode_file(to_charlist(Path.join(dir, path))) do
       statements = if is_list(hd(sql)), do: sql, else: [sql]
       statements = Enum.map(statements, &String.replace(to_string(&1), ~r{(VARING)}, "VARYING"))
       {"#{feature} #{id}", Enum.map(statements, &{trim(&1), &1})}
@@ -36,12 +54,26 @@ defmodule Mix.Tasks.Sql.Gen.Test do
     |> String.replace(~r{'\s+\)}, &String.replace(&1, " ", ""))
     |> String.replace(~r{\*\s+\)}, &String.replace(&1, " ", ""))
     |> String.replace(~r{\)\s+\)}, &String.replace(&1, " ", ""))
-    |> String.replace(~r{\W(SELECT|REFERENCES|INSERT|UPDATE|IN|MYTEMP)\(}, &Enum.join(Regex.split(~r{\(}, &1, include_captures: true, trim: true), " "))
-    |> String.replace(~r{^(SELECT)\(}, &Enum.join(Regex.split(~r{\(}, &1, include_captures: true, trim: true), " "))
+    |> String.replace(
+      ~r{\W(SELECT|REFERENCES|INSERT|UPDATE|IN|MYTEMP)\(},
+      &Enum.join(Regex.split(~r{\(}, &1, include_captures: true, trim: true), " ")
+    )
+    |> String.replace(
+      ~r{^(SELECT)\(},
+      &Enum.join(Regex.split(~r{\(}, &1, include_captures: true, trim: true), " ")
+    )
     |> String.replace(~r{\s+\.\s+}, &String.replace(&1, " ", ""))
-    |> String.replace(~r{\d\s(\+|\-)\d}, &Enum.join(Enum.map(Regex.split(~r{\+|\-}, &1, include_captures: true, trim: true), fn x -> String.trim(x) end), " "))
+    |> String.replace(
+      ~r{\d\s(\+|\-)\d},
+      &Enum.join(
+        Enum.map(Regex.split(~r{\+|\-}, &1, include_captures: true, trim: true), fn x ->
+          String.trim(x)
+        end),
+        " "
+      )
+    )
     |> String.trim()
- end
+  end
 
   embed_template(:test, """
   # SPDX-License-Identifier: Apache-2.0
