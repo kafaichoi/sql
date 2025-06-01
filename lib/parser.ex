@@ -126,6 +126,9 @@ defmodule SQL.Parser do
   def insert_node({:with = tag, meta, []}, [{:ident, _, _} = l, {:parens, _, _} = r, {:as = t2, m2, a}], [], context, root) do
     {[], [], context, root ++ [{tag, meta, [{t2, m2, [[l, r] | a]}]}]}
   end
+  def insert_node({:with = tag, meta, []}, unit, acc, context, root) do
+    {[], [], context, root ++ [{tag, meta, unit ++ acc}]}
+  end
   def insert_node({tag, meta, []}, unit, acc, context, root) when tag in ~w[by in references]a do
     {[{tag, meta, predicate(unit ++ acc)}], [], context, root}
   end
